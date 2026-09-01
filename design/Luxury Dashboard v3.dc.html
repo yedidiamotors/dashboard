@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&family=Cinzel:wght@400;600&display=swap" rel="stylesheet" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  html, body { margin: 0; padding: 0; background: #0A0A0B; }
+  * { box-sizing: border-box; }
+  a { color: #D8DCE0; text-decoration: none; }
+  a:hover { color: #FFFFFF; }
+  ::selection { background: rgba(200,16,46,0.35); }
+  @media (max-width: 1180px) {
+    [data-r="shell"] { grid-template-columns: 1fr !important; }
+    [data-r="aside"] { border-left: none !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; flex-direction: row !important; align-items: center !important; gap: 20px !important; padding: 14px 20px !important; overflow-x: auto !important; }
+    [data-r="logo"] { width: 190px !important; flex: none !important; }
+    [data-r="nav"] { flex-direction: row !important; gap: 4px !important; flex: 1 !important; }
+    [data-r="aside-foot"] { margin-top: 0 !important; flex-direction: row !important; align-items: center !important; gap: 12px !important; flex: none !important; }
+    [data-r="tagline"] { display: none !important; }
+    [data-r="main"] { padding: 20px 20px 36px !important; }
+    [data-r="kpis"] { grid-template-columns: repeat(2, 1fr) !important; }
+    [data-r="split"] { grid-template-columns: 1fr !important; }
+    [data-r="side-col"] { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; align-items: start !important; }
+  }
+  @media (max-width: 760px) {
+    [data-r="aside"] { flex-wrap: wrap !important; }
+    [data-r="nav"] { order: 3 !important; width: 100% !important; overflow-x: auto !important; }
+    [data-r="main"] { padding: 16px 14px 32px !important; }
+    [data-r="topbar"] { flex-direction: column !important; align-items: stretch !important; gap: 14px !important; }
+    [data-r="search"] { display: none !important; }
+    [data-r="hero"] { height: auto !important; padding: 22px 18px !important; background-image: linear-gradient(180deg, rgba(10,10,11,0.9), rgba(10,10,11,0.72)), url('assets/showroom.png') !important; }
+    [data-r="kpis"] { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+    [data-r="side-col"] { grid-template-columns: 1fr !important; }
+    [data-r="filters"] { width: 100% !important; overflow-x: auto !important; }
+    [data-r="card-head"] { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+    [data-r="thead"] { display: none !important; }
+    [data-r="row"] { grid-template-columns: 72px 1fr auto !important; padding: 12px 16px !important; }
+    [data-r="cell-hide"] { display: none !important; }
+    [data-r="row-meta"] { display: block !important; }
+  }
+</style>
+</helmet>
+<div data-r="shell" dir="rtl" style="width: 100%; max-width: 1440px; min-height: 1024px; display: grid; grid-template-columns: 236px 1fr; background: #0A0A0B; color: #EDEEF0; font-family: Heebo, sans-serif;">
+
+  <aside data-r="aside" style="background: #101113; border-left: 1px solid rgba(255,255,255,0.08); padding: 26px 18px; display: flex; flex-direction: column; gap: 28px;">
+    <div data-r="logo" style="padding: 0 4px;">
+      <img src="assets/logo.png" alt="YEDIDIA MOTORS · רכבי יוקרה · ביבוא מקביל" style="display: block; width: 100%; height: auto;" />
+    </div>
+
+    <nav data-r="nav" style="display: flex; flex-direction: column; gap: 2px;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 6px; font-size: 14px; color: #9AA0A6; white-space: nowrap;" style-hover="background: rgba(255,255,255,0.05); color: #FFFFFF;">
+        <span style="width: 5px; height: 5px; border-radius: 50%; background: #3A3D42; flex: none;"></span>סקירה כללית
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 6px; background: rgba(255,255,255,0.06); box-shadow: inset 2px 0 0 #C8102E; font-size: 14px; font-weight: 500; color: #FFFFFF; white-space: nowrap;">
+        <span style="width: 5px; height: 5px; border-radius: 50%; background: #C8102E; flex: none;"></span>מלאי רכבים
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 6px; font-size: 14px; color: #9AA0A6; white-space: nowrap;" style-hover="background: rgba(255,255,255,0.05); color: #FFFFFF;">
+        <span style="width: 5px; height: 5px; border-radius: 50%; background: #3A3D42; flex: none;"></span>הזמנות בדרך
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 6px; font-size: 14px; color: #9AA0A6; white-space: nowrap;" style-hover="background: rgba(255,255,255,0.05); color: #FFFFFF;">
+        <span style="width: 5px; height: 5px; border-radius: 50%; background: #3A3D42; flex: none;"></span>לידים ולקוחות
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 6px; font-size: 14px; color: #9AA0A6; white-space: nowrap;" style-hover="background: rgba(255,255,255,0.05); color: #FFFFFF;">
+        <span style="width: 5px; height: 5px; border-radius: 50%; background: #3A3D42; flex: none;"></span>עסקאות ומימון
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 6px; font-size: 14px; color: #9AA0A6; white-space: nowrap;" style-hover="background: rgba(255,255,255,0.05); color: #FFFFFF;">
+        <span style="width: 5px; height: 5px; border-radius: 50%; background: #3A3D42; flex: none;"></span>טסט דרייב
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 6px; font-size: 14px; color: #9AA0A6; white-space: nowrap;" style-hover="background: rgba(255,255,255,0.05); color: #FFFFFF;">
+        <span style="width: 5px; height: 5px; border-radius: 50%; background: #3A3D42; flex: none;"></span>דוחות
+      </div>
+    </nav>
+
+    <div data-r="aside-foot" style="margin-top: auto; display: flex; flex-direction: column; gap: 14px;">
+      <sc-if value="{{ isManager }}" hint-placeholder-val="{{ true }}">
+        <div style="border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 8px; background: #16181B; min-width: 190px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <span style="font-size: 12px; color: #8C9298;">שווי המלאי במגרש</span>
+            <span style="font-size: 10px; letter-spacing: 0.08em; color: #F0899C; border: 1px solid rgba(200,16,46,0.45); border-radius: 3px; padding: 1px 5px; white-space: nowrap;">הנהלה</span>
+          </div>
+          <div style="font-family: Cinzel, serif; font-size: 25px; font-weight: 600; line-height: 1; color: #FFFFFF;">{{ stockValue }}</div>
+          <div style="font-size: 12.5px; color: #8C9298;">118 רכבים · 41 ימי מלאי בממוצע</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isSales }}" hint-placeholder-val="{{ false }}">
+        <div style="border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 9px; background: #16181B; min-width: 190px;">
+          <div style="font-size: 12px; color: #8C9298;">היעד שלי בספטמבר</div>
+          <div style="display: flex; align-items: baseline; gap: 6px;">
+            <span style="font-family: Cinzel, serif; font-size: 25px; font-weight: 600; line-height: 1; color: #FFFFFF;">7</span>
+            <span style="font-size: 13px; color: #8C9298;">מתוך 10 מסירות</span>
+          </div>
+          <div style="height: 4px; border-radius: 2px; background: rgba(255,255,255,0.09); overflow: hidden;">
+            <div style="height: 100%; width: {{ goalWidth }}; background: #C8102E;"></div>
+          </div>
+          <div style="font-size: 12.5px; color: #8C9298;">עמלה צפויה ₪31.4K · נותרו 9 ימים</div>
+        </div>
+      </sc-if>
+      <div data-r="tagline" style="font-size: 11px; letter-spacing: 0.12em; color: #6E7378; text-align: center;">FOR PEOPLE WHO LOVE THE LIFE</div>
+    </div>
+  </aside>
+
+  <main data-r="main" style="padding: 26px 32px 44px; display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+
+    <header data-r="topbar" style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div style="font-size: 11.5px; letter-spacing: 0.16em; color: #8C9298;">{{ sectionLabel }}</div>
+        <h1 style="margin: 0; font-family: Cinzel, serif; font-size: 27px; font-weight: 400; color: #FFFFFF;">בוקר טוב, דניאל</h1>
+        <div style="font-size: 13.5px; color: #8C9298;">{{ branchLine }} · עודכן היום 08:40</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div data-r="search" style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; background: #14161A; min-width: 250px; color: #7E848A; font-size: 13.5px;">
+          <span style="width: 12px; height: 12px; border: 1.5px solid #7E848A; border-radius: 50%; flex: none;"></span>דגם, מספר שלדה או צבע
+        </div>
+        <div style="height: 44px; padding: 0 17px; display: flex; align-items: center; border-radius: 6px; background: #C8102E; color: #FFFFFF; font-size: 13.5px; font-weight: 500; white-space: nowrap;" style-hover="background: #E01B3B;">{{ primaryAction }}</div>
+        <div style="width: 44px; height: 44px; border-radius: 50%; background: #1C1F23; border: 1px solid rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: #E4E6E9; flex: none;">ד.כ</div>
+      </div>
+    </header>
+
+    <section data-r="hero" style="border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; overflow: hidden; height: 168px; background-image: linear-gradient(90deg, rgba(10,10,11,0.92) 30%, rgba(10,10,11,0.25) 78%), url('assets/showroom.png'); background-size: cover, 140%; background-position: center, center 32%; display: flex; align-items: center; padding: 0 30px;">
+      <div style="display: flex; flex-direction: column; gap: 7px; max-width: 520px;">
+        <div style="font-family: Cinzel, serif; font-size: 20px; color: #FFFFFF; letter-spacing: 0.03em;">מגוון מותגים, מגוון רכבים · יבואן אחד</div>
+        <div style="font-size: 13.5px; color: #B9BDC2; line-height: 1.6;">Land Rover · Mercedes-Benz · BMW · Porsche · Jeep · RAM TRX</div>
+        <div style="display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap;">
+          <span style="font-size: 11.5px; padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); color: #D8DCE0;">100% מימון</span>
+          <span style="font-size: 11.5px; padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); color: #D8DCE0;">אחריות ושירות</span>
+          <span style="font-size: 11.5px; padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); color: #D8DCE0;">שיטת שלם וסע</span>
+        </div>
+      </div>
+    </section>
+
+    <section data-r="kpis" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+        <div style="border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; background: #14161A; padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 11px;">
+          <div style="font-size: 12.5px; color: #8C9298;">{{ k.label }}</div>
+          <div style="display: flex; align-items: baseline; gap: 7px;">
+            <span style="font-family: Cinzel, serif; font-size: 30px; font-weight: 600; line-height: 1; color: #FFFFFF;">{{ k.value }}</span>
+            <span style="font-size: 13px; color: #8C9298;">{{ k.unit }}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #8C9298; flex-wrap: wrap;">
+            <span style="padding: 2px 7px; border-radius: 4px; background: rgba(200,16,46,0.16); color: #F0899C; font-weight: 500;">{{ k.delta }}</span>{{ k.note }}
+          </div>
+        </div>
+      </sc-for>
+    </section>
+
+    <section data-r="split" style="display: grid; grid-template-columns: 1.62fr 1fr; gap: 16px; align-items: start;">
+
+      <div style="border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; background: #14161A; overflow: hidden;">
+        <div data-r="card-head" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px 14px;">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 500; color: #FFFFFF; white-space: nowrap;">{{ inventoryTitle }}</h2>
+          <div data-r="filters" style="display: flex; gap: 6px;">
+            <span style="font-size: 11.5px; padding: 6px 10px; border-radius: 4px; background: #C8102E; color: #FFFFFF; white-space: nowrap;">הכל</span>
+            <span style="font-size: 11.5px; padding: 6px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.14); color: #9AA0A6; white-space: nowrap;" style-hover="border-color: #C8102E; color: #FFFFFF;">LAND ROVER</span>
+            <span style="font-size: 11.5px; padding: 6px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.14); color: #9AA0A6; white-space: nowrap;" style-hover="border-color: #C8102E; color: #FFFFFF;">MERCEDES</span>
+            <span style="font-size: 11.5px; padding: 6px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.14); color: #9AA0A6; white-space: nowrap;" style-hover="border-color: #C8102E; color: #FFFFFF;">BMW</span>
+            <span style="font-size: 11.5px; padding: 6px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.14); color: #9AA0A6; white-space: nowrap;" style-hover="border-color: #C8102E; color: #FFFFFF;">PORSCHE</span>
+            <span style="font-size: 11.5px; padding: 6px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.14); color: #9AA0A6; white-space: nowrap;" style-hover="border-color: #C8102E; color: #FFFFFF;">JEEP</span>
+          </div>
+        </div>
+        <div data-r="thead" style="display: grid; grid-template-columns: 96px 1fr 54px 104px 54px 88px; gap: 10px; padding: 9px 22px; font-size: 11.5px; letter-spacing: 0.05em; color: #7E848A; background: #101216; border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.07);">
+          <div>רכב</div><div>דגם וגמר</div><div>שנה</div><div>מחיר</div><div>ימים</div><div>סטטוס</div>
+        </div>
+        <sc-for list="{{ inventory }}" as="car" hint-placeholder-count="6">
+          <div data-r="row" style="display: grid; grid-template-columns: 96px 1fr 54px 104px 54px 88px; gap: 10px; padding: 12px 22px; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.055);" style-hover="background: rgba(255,255,255,0.03);">
+            <div style="height: 56px; border-radius: 5px; background-color: #1B1E22; background-image: repeating-linear-gradient(115deg, rgba(255,255,255,0.05) 0 6px, transparent 6px 12px); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px;">
+              <span style="font-family: ui-monospace, monospace; font-size: 8px; color: #71767C;">car shot</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+              <div style="font-size: 14.5px; font-weight: 500; color: #FFFFFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ car.model }}</div>
+              <div style="font-size: 12.5px; color: #8C9298; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ car.trim }}</div>
+              <div data-r="row-meta" style="display: none; font-size: 12px; color: #71767C;">{{ car.meta }}</div>
+            </div>
+            <div data-r="cell-hide" style="font-size: 13.5px; color: #C4C8CD;">{{ car.year }}</div>
+            <div style="font-size: 14px; font-weight: 500; color: #FFFFFF; font-variant-numeric: tabular-nums; text-align: left;">{{ car.price }}</div>
+            <div data-r="cell-hide" style="font-size: 13.5px; color: #C4C8CD; font-variant-numeric: tabular-nums;">{{ car.days }}</div>
+            <div data-r="cell-hide" style="font-size: 12px; padding: 4px 9px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.14); color: #B9BDC2; justify-self: start; white-space: nowrap;">{{ car.status }}</div>
+          </div>
+        </sc-for>
+        <div style="padding: 13px 22px; font-size: 13px; color: #F0899C;">הצג את כל 118 הרכבים ←</div>
+      </div>
+
+      <div data-r="side-col" style="display: flex; flex-direction: column; gap: 16px;">
+
+        <sc-if value="{{ isSales }}" hint-placeholder-val="{{ false }}">
+          <div style="border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; background: #14161A; padding: 19px 22px 20px; display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <h2 style="margin: 0; font-size: 16px; font-weight: 500; color: #FFFFFF;">טסט דרייב היום</h2>
+              <span style="font-size: 12.5px; color: #8C9298;">4 פגישות</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <sc-for list="{{ myDrives }}" as="d" hint-placeholder-count="4">
+                <div style="display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center;">
+                  <div style="font-size: 14px; font-weight: 500; color: #F0899C; font-variant-numeric: tabular-nums;">{{ d.time }}</div>
+                  <div style="display: flex; flex-direction: column; gap: 2px; border-right: 1px solid rgba(255,255,255,0.1); padding-right: 12px; min-width: 0;">
+                    <span style="font-size: 14px; color: #EDEEF0;">{{ d.client }}</span>
+                    <span style="font-size: 12.5px; color: #8C9298;">{{ d.car }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; background: #14161A; padding: 19px 22px 20px; display: flex; flex-direction: column; gap: 14px;">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 500; color: #FFFFFF;">הלידים שלי לטיפול</h2>
+            <div style="display: flex; flex-direction: column; gap: 13px;">
+              <sc-for list="{{ myLeads }}" as="l" hint-placeholder-count="4">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                  <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                    <span style="font-size: 14px; color: #EDEEF0;">{{ l.name }}</span>
+                    <span style="font-size: 12.5px; color: #8C9298;">{{ l.interest }}</span>
+                  </div>
+                  <span style="font-size: 12px; padding: 3px 9px; border-radius: 4px; background: rgba(255,255,255,0.07); color: #C4C8CD; white-space: nowrap;">{{ l.tag }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; background: #14161A; padding: 19px 22px 20px; display: flex; flex-direction: column; gap: 15px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 500; color: #FFFFFF;">תמהיל מלאי לפי מותג</h2>
+            <span style="font-size: 12.5px; color: #8C9298;">118 רכבים</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 13px;">
+            <sc-for list="{{ brands }}" as="b" hint-placeholder-count="5">
+              <div style="display: flex; flex-direction: column; gap: 7px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+                  <span style="font-size: 13px; letter-spacing: 0.05em; color: #DDE0E4;">{{ b.name }}</span>
+                  <span style="font-size: 12.5px; color: #8C9298; white-space: nowrap;">{{ b.units }}</span>
+                </div>
+                <div style="height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden;">
+                  <div style="height: 100%; width: {{ b.width }}; background: #C8102E;"></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ isManager }}" hint-placeholder-val="{{ true }}">
+          <div style="border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; background: #14161A; padding: 19px 22px 20px; display: flex; flex-direction: column; gap: 14px;">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 500; color: #FFFFFF;">דורש תשומת לב</h2>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <sc-for list="{{ alerts }}" as="a" hint-placeholder-count="4">
+                <div style="display: flex; gap: 11px; align-items: flex-start;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: #C8102E; margin-top: 7px; flex: none;"></span>
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 14px; color: #EDEEF0;">{{ a.title }}</span>
+                    <span style="font-size: 12.5px; color: #8C9298;">{{ a.detail }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; background: #14161A; padding: 19px 22px 20px; display: flex; flex-direction: column; gap: 14px;">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 500; color: #FFFFFF;">הזמנות בדרך</h2>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <sc-for list="{{ incoming }}" as="i" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                  <span style="font-size: 14px; color: #EDEEF0;">{{ i.model }}</span>
+                  <span style="font-size: 12.5px; color: #8C9298;">{{ i.note }}</span>
+                </div>
+                <span style="font-size: 12px; padding: 3px 9px; border-radius: 4px; background: rgba(255,255,255,0.07); color: #C4C8CD; white-space: nowrap;">{{ i.eta }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;branchName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;מגרש ראשי&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;viewMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;איש מכירות&quot;,&quot;מנהל מכירות&quot;,&quot;מנהל מלאי&quot;,&quot;בעלים&quot;],&quot;default&quot;:&quot;איש מכירות&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const branch = this.props.branchName ?? 'מגרש ראשי';
+    const view = this.props.viewMode ?? 'איש מכירות';
+    const nis = n => '₪' + n.toLocaleString('en-US');
+    const isManager = view === 'מנהל מלאי' || view === 'מנהל מכירות' || view === 'בעלים';
+    const brandsRaw = [['LAND ROVER', 32], ['MERCEDES-BENZ', 27], ['BMW', 24], ['PORSCHE', 14], ['JEEP · RAM TRX', 21]];
+
+    return {
+      branchLine: branch + ' · ' + view,
+      sectionLabel: isManager ? 'מלאי רכבים' : 'יום המכירות שלי',
+      primaryAction: isManager ? 'הוספת רכב למלאי' : 'עסקה חדשה',
+      inventoryTitle: isManager ? 'רכבים במלאי' : 'זמין להצעה ללקוח',
+      isManager: isManager,
+      isSales: !isManager,
+      stockValue: '₪74.6M',
+      goalWidth: '70%',
+      kpis: isManager ? [
+        { label: 'רכבים זמינים למסירה', value: '61', unit: 'מתוך 118', delta: '−7', note: 'מול שבוע קודם' },
+        { label: 'שמורים ללקוח', value: '23', unit: 'רכבים', delta: '4 חדשים', note: 'ב-7 ימים' },
+        { label: 'ימי מלאי ממוצע', value: '41', unit: 'ימים', delta: '−6', note: 'שיפור ברוטציה' },
+        { label: 'מעל 90 ימים במלאי', value: '9', unit: 'רכבים', delta: 'לתמחור מחדש', note: '' }
+      ] : [
+        { label: 'מסירות שלי החודש', value: '7', unit: 'מתוך יעד 10', delta: '70%', note: 'נותרו 9 ימים' },
+        { label: 'עמלה צפויה', value: '₪31.4K', unit: '', delta: '+₪6.2K', note: 'מעסקאות בסגירה' },
+        { label: 'לידים פתוחים', value: '18', unit: 'לקוחות', delta: '5 חמים', note: 'לחזור היום' },
+        { label: 'טסט דרייב היום', value: '4', unit: 'פגישות', delta: '09:30', note: 'הפגישה הקרובה' }
+      ],
+      inventory: [
+        { model: 'Land Rover Defender 110', trim: 'X-Dynamic HSE · אפור אייגר', year: 2026, price: nis(689000), days: 12, status: 'זמין', meta: '2026 · 12 ימים במלאי · זמין' },
+        { model: 'Mercedes-Benz GLE 53 AMG', trim: '4MATIC+ · שחור אובסידיאן', year: 2026, price: nis(824000), days: 8, status: 'שמור', meta: '2026 · 8 ימים במלאי · שמור' },
+        { model: 'BMW X5 xDrive40i', trim: 'M Sport Pro · אפור סופיסטו', year: 2026, price: nis(624000), days: 96, status: 'לתמחור', meta: '2026 · 96 ימים במלאי · לתמחור' },
+        { model: 'Porsche Cayenne S', trim: 'Sport Chrono · לבן קרארה', year: 2025, price: nis(912000), days: 34, status: 'בהכנה', meta: '2025 · 34 ימים במלאי · בהכנה' },
+        { model: 'Jeep Wrangler Rubicon', trim: '392 V8 · שחור', year: 2025, price: nis(548000), days: 21, status: 'זמין', meta: '2025 · 21 ימים במלאי · זמין' },
+        { model: 'RAM 1500 TRX', trim: 'Final Edition · אדום פלייר', year: 2026, price: nis(795000), days: 47, status: 'זמין', meta: '2026 · 47 ימים במלאי · זמין' }
+      ],
+      brands: brandsRaw.map(([name, units]) => ({ name, units: units + ' רכבים', width: Math.round(units / 32 * 100) + '%' })),
+      alerts: [
+        { title: '9 רכבים מעל 90 ימים במלאי', detail: 'שווי מוקפא של ₪5.9M · מומלץ עדכון מחירון' },
+        { title: 'BMW X5 xDrive40i · אפור', detail: '96 ימים במלאי, ללא פניות ב-30 הימים האחרונים' },
+        { title: '3 רכבים ממתינים לבדיקת מסירה', detail: 'חוסמים מסירות שנקבעו לסוף השבוע' },
+        { title: 'מלאי Porsche מתחת לרף', detail: '14 רכבים · יעד מגרש 20' }
+      ],
+      myDrives: [
+        { time: '09:30', client: 'רונן אביטל', car: 'BMW X5 xDrive40i' },
+        { time: '11:00', client: 'מיכל שגב', car: 'Mercedes-Benz GLE 53 AMG' },
+        { time: '13:15', client: 'חברת נובה בע״מ', car: 'Land Rover Defender 110' },
+        { time: '16:45', client: 'אלון ברקת', car: 'Porsche Cayenne S' }
+      ],
+      myLeads: [
+        { name: 'שירן דהן', interest: 'Mercedes-Benz GLC · ליסינג פרטי', tag: 'חם' },
+        { name: 'עו״ד יובל נחום', interest: 'BMW X7 · טרייד-אין', tag: 'הצעה נשלחה' },
+        { name: 'נטע גולן', interest: 'Jeep Wrangler · מימון 100%', tag: 'לחזור היום' },
+        { name: 'איתי פרידמן', interest: 'RAM 1500 TRX · מלאי מיידי', tag: 'חדש' }
+      ],
+      incoming: [
+        { model: '4 × Mercedes-Benz GLC 300', note: 'יבוא מקביל · נמל חיפה', eta: '9 ימים' },
+        { model: '2 × BMW X7 xDrive40i', note: 'הוזמן לפי דרישת לקוח', eta: '3 שבועות' },
+        { model: '3 × Land Rover Defender 130', note: 'צי חברה · קבוצת מרידיאן', eta: '5 שבועות' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
