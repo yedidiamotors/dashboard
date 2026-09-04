@@ -1,3 +1,34 @@
+# Yedidia Motors — Staff Panel
+
+**Live: https://panel.yedidia-motors.com** — GitHub Pages, `main` / `(root)`, no build step.
+
+| File | Role |
+|---|---|
+| `login.html` | WhatsApp OTP sign-in (phone -> 6-digit code) |
+| `index.html` | Overview screen shell |
+| `app.css` | All design tokens from `design/Luxury Dashboard v3.dc.html` |
+| `auth.js` | Shared API layer, session storage, formatting |
+| `app.js` | Overview screen logic — load, role-aware render, filter, refresh |
+
+The browser never talks to the database. Every call goes to n8n
+(`https://yedidiamotors.duckdns.org/webhook/...`), which calls Postgres functions in
+Supabase with the service key. **All permission filtering happens in the database** —
+without `view_import_purchase_price`, prices and stock value never leave the server.
+
+Auth endpoints: `/staff-auth/request-otp`, `/staff-auth/verify`, `/staff-auth/session`,
+`/staff-auth/logout`. Data endpoint: `/dashboard/summary`.
+
+> **Any new domain serving this panel must be added to `allowedOrigins` on every one of
+> those n8n webhook nodes**, or the browser blocks the calls — and it looks exactly like
+> a server outage.
+
+The stack is plain static HTML/CSS/JS rather than the Vite + React setup suggested below:
+the panel renders one JSON payload, so a build step would add an Action and an npm
+dependency without changing the result. Revisit if the remaining six screens land with
+real routing and state.
+
+---
+
 # Handoff: Yedidia Motors — Dealer Dashboard (RTL)
 
 ## Overview
