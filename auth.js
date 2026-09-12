@@ -127,6 +127,7 @@
   /* ---- ניווט משותף לכל המסכים ---- */
   var NAV = [
     { label: 'סקירה כללית',    href: 'index.html' },
+    { label: 'מלאי רכבים', href: 'inventory.html', perm: 'view_vehicle_files' },
     { label: 'מלאי רכבים',      soon: true },
     { label: 'הזמנות בדרך',     soon: true },
     { label: 'לידים ולקוחות',   soon: true },
@@ -134,6 +135,48 @@
     { label: 'מכולות ומכס',     soon: true },
     { label: 'משתמשים והרשאות', href: 'users.html', perm: 'manage_staff_users' }
   ];
+
+  /* ---- תפריט המבורגר למסכי טלפון ---- */
+  function mountDrawer(host) {
+    var aside = host.closest ? host.closest('.aside') : null;
+    if (!aside || aside.querySelector('.nav-toggle')) return;
+
+    var drawer = document.createElement('div');
+    drawer.className = 'aside-drawer';
+    aside.insertBefore(drawer, host);
+    drawer.appendChild(host);
+    var foot = aside.querySelector('.aside-foot');
+    if (foot) drawer.appendChild(foot);
+
+    var btn = document.createElement('button');
+    btn.className = 'nav-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', '\u05ea\u05e4\u05e8\u05d9\u05d8');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.innerHTML = '<span></span><span></span><span></span>';
+    aside.insertBefore(btn, aside.firstChild);
+
+    function setOpen(on) {
+      aside.classList.toggle('is-open', on);
+      btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    }
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      setOpen(!aside.classList.contains('is-open'));
+    });
+    drawer.addEventListener('click', function (e) {
+      if (e.target.closest('.nav-item, .signout')) setOpen(false);
+    });
+    document.addEventListener('click', function (e) {
+      if (!aside.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') setOpen(false);
+    });
+    window.addEventListener('resize', function () {
+      if (window.innerWidth > 760) setOpen(false);
+    });
+  }
 
   function renderNav(containerId, currentHref, permissions) {
     var host = document.getElementById(containerId);
@@ -153,6 +196,7 @@
         b.addEventListener('click', function () { location.href = href; });
       }
     });
+    mountDrawer(host);
   }
 
   global.YM = {
