@@ -133,7 +133,8 @@
     { label: 'לידים ולקוחות',   soon: true },
     { label: 'עסקאות ומימון',   soon: true },
     { label: 'מכולות ומכס',     soon: true },
-    { label: 'משתמשים והרשאות', href: 'users.html', perm: 'manage_staff_users' }
+    { label: 'משתמשים והרשאות', href: 'users.html', perm: 'manage_staff_users' },
+    { label: 'לוג משתמשים', href: 'log.html', perm: 'view_access_log' }
   ];
 
   /* ---- תפריט המבורגר למסכי טלפון ---- */
