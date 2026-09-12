@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>לוג משתמשים · ידידיה מוטורס</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="log.css">
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="mark">YEDIDIA MOTORS</div>
+  <div class="spinner"></div>
+  <div class="msg">טוען את הלוג…</div>
+</div>
+
+<div class="shell" id="shell" hidden>
+
+  <aside class="aside">
+    <div class="logo"><img src="design/assets/logo.png" alt="ידידיה מוטורס"></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="aside-foot">
+      <div id="side-box"></div>
+      <div class="tagline">FOR PEOPLE WHO LOVE THE LIFE</div>
+      <button class="signout" type="button" id="signout">יציאה מהחשבון</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <header class="topbar">
+      <div class="who">
+        <div class="eyebrow" id="eyebrow">ניהול המערכת</div>
+        <h1 class="greeting">לוג משתמשים</h1>
+        <div class="meta-line" id="meta-line">מי היה איפה, כמה זמן, ומה נגע</div>
+      </div>
+      <div class="tools">
+        <div class="filter-group" id="days-filters" aria-label="טווח ימים"></div>
+        <div class="avatar" id="avatar">—</div>
+      </div>
+    </header>
+
+    <div id="notice"></div>
+
+    <section class="users-strip" id="users-strip"></section>
+
+    <div class="card">
+      <div class="card-head">
+        <h2 id="timeline-title">ציר זמן</h2>
+        <div class="filter-group" id="kind-filters" aria-label="סינון לפי סוג אירוע"></div>
+      </div>
+      <div class="thead log-grid">
+        <div>מתי</div><div>מי</div><div>סוג</div><div>מה</div><div>פרטים</div>
+      </div>
+      <div id="rows"></div>
+      <div class="card-foot" id="foot"></div>
+    </div>
+
+  </main>
+</div>
+
+<script src="auth.js"></script>
+<script src="log.js"></script>
+</body>
+</html>
