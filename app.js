@@ -10,7 +10,6 @@
   var state = { data: null, brandFilter: 'all', search: '' };
   var REFRESH_MS = 5 * 60 * 1000;
 
-  /* ---------- אתחול ---------- */
   var session = YM.getSession();
   if (!session) { location.replace('login.html'); return; }
 
@@ -54,7 +53,6 @@
     }
 
     state.data = res;
-    // רענון פרטי המשתמש בסשן המקומי — הרשאות יכולות להשתנות בין כניסות
     try {
       var s = YM.getSession() || {};
       s.user = res.user; s.permissions = res.permissions;
@@ -83,7 +81,6 @@
     var canFiles = perms.indexOf('view_vehicle_files') > -1;
     var now = new Date();
 
-    /* כותרת עליונה */
     document.getElementById('greeting').textContent =
       YM.greetingFor(now) + ', ' + (user.name || '');
     document.getElementById('eyebrow').textContent = isSales ? 'יום המכירות שלי' : 'סקירת מלאי';
@@ -93,7 +90,8 @@
     document.getElementById('inventory-title').textContent =
       isSales ? 'זמין להצעה ללקוח' : 'רכבים במלאי';
 
-    /* קופסת הסרגל */
+    YM.renderNav('nav', 'index.html', perms);
+
     var box = document.getElementById('side-box');
     if (isManager && canPrice) {
       box.innerHTML =
@@ -101,8 +99,9 @@
           '<div class="row"><span class="label">שווי המלאי במגרש</span>' +
           '<span class="badge-admin">הנהלה</span></div>' +
           '<div class="stat-figure">' + E(YM.shortNis(d.stock_value)) + '</div>' +
-          '<div class="stat-note">' + d.kpis.total + ' רכבים · ' +
-            d.kpis.avg_days_in_stock + ' ימי מלאי בממוצע</div>' +
+          '<div class="stat-note">' + d.kpis.total + ' במלאי · ' +
+            d.kpis.avg_days_in_stock + ' ימי מלאי בממוצע<br>' +
+            (d.kpis.delivered_total || 0) + ' נמסרו עד היום</div>' +
         '</div>';
     } else if (isSales) {
       var delivered = d.kpis.my_deliveries_this_month;
@@ -127,7 +126,6 @@
         '</div>';
     }
 
-    /* מדדים */
     var kpis = isSales ? [
       { label: 'מסירות שלי החודש', value: d.kpis.my_deliveries_this_month, unit: 'מתוך יעד 10',
         delta: Math.round(d.kpis.my_deliveries_this_month / 10 * 100) + '%', note: 'מהיעד החודשי' },
@@ -136,7 +134,7 @@
       { label: 'לידים פתוחים', value: d.kpis.open_leads, unit: 'פניות',
         delta: '', note: 'מהאתר, ממתינים למענה' },
       { label: 'זמין להצעה', value: d.kpis.available, unit: 'רכבים',
-        delta: '', note: d.kpis.in_transit + ' נוספים בדרך' }
+        delta: '', note: 'במלאי בארץ' }
     ] : [
       { label: 'רכבים זמינים למסירה', value: d.kpis.available, unit: 'מתוך ' + d.kpis.total,
         delta: '', note: 'במלאי בארץ' },
@@ -160,7 +158,6 @@
       '</div>';
     }).join('');
 
-    /* צ׳יפים של יצרנים */
     var brands = d.brands || [];
     var chips = ['<button class="chip' + (state.brandFilter === 'all' ? ' is-active' : '') +
                  '" data-brand="all" type="button">הכל</button>'];
@@ -177,12 +174,11 @@
       });
     });
 
-    /* טבלת המלאי */
     var list = (d.inventory || []).filter(function (v) {
       if (state.brandFilter !== 'all' &&
           String(v.make || '').toUpperCase() !== state.brandFilter) return false;
       if (state.search) {
-        var hay = [v.model, v.trim, v.vin_tail, v.order_number, v.lot, v.status_he]
+        var hay = [v.model, v.trim, v.vin_tail, v.order_number, v.lot, v.status_he, v.location]
           .join(' ').toLowerCase();
         if (hay.indexOf(state.search) === -1) return false;
       }
@@ -196,12 +192,13 @@
     } else if (!list.length) {
       rowsEl.innerHTML = '<div class="empty">' +
         (d.kpis.total === 0
-          ? 'אין עדיין רכבים במערכת.<br>תיקי רכב נפתחים אוטומטית מהמיילים ומהמדבקות בוואטסאפ.'
+          ? 'אין כרגע רכבים במלאי.'
           : 'לא נמצאו רכבים התואמים לסינון.') +
         '</div>';
     } else {
       rowsEl.innerHTML = list.map(function (v) {
-        var meta = [v.year, v.days + ' ימים במלאי', v.status_he].filter(Boolean).join(' · ');
+        var meta = [v.year, v.days + ' ימים במלאי', v.location, v.status_he]
+          .filter(Boolean).join(' · ');
         var priceCell = v.price === null || v.price === undefined
           ? '<div class="price hidden-perm cell-hide">—</div>'
           : '<div class="price">' + E(YM.nis(v.price)) + '</div>';
@@ -209,7 +206,9 @@
           '<div class="thumb"><span>' + E(v.vin_tail || '—') + '</span></div>' +
           '<div class="names">' +
             '<div class="model">' + E(v.model || '—') + '</div>' +
-            '<div class="trim">' + E(v.trim || '—') + '</div>' +
+            '<div class="trim">' + E(v.trim || '—') +
+              (v.location ? ' <span style="color:var(--text-fainter-2)">· ' + E(v.location) + '</span>' : '') +
+            '</div>' +
             '<div class="row-meta">' + E(meta) + '</div>' +
           '</div>' +
           '<div class="year cell-hide">' + E(v.year || '—') + '</div>' +
@@ -222,10 +221,9 @@
 
     document.getElementById('inventory-foot').textContent =
       canFiles && d.kpis.total
-        ? 'מוצגים ' + list.length + ' מתוך ' + d.kpis.total + ' תיקי רכב פעילים'
+        ? 'מוצגים ' + list.length + ' מתוך ' + d.kpis.total + ' רכבים במלאי'
         : '';
 
-    /* כרטיסי צד */
     var side = [];
 
     if (isSales && (d.leads || []).length) {
@@ -250,7 +248,7 @@
                   Math.round(b.units / maxUnits * 100) + '%"></div></div>' +
               '</div>';
             }).join('') + '</div>'
-          : '<div class="empty small">אין עדיין רכבים במלאי.</div>'));
+          : '<div class="empty small">אין כרגע רכבים במלאי.</div>'));
 
       if (isManager) {
         side.push(card('דורש תשומת לב', '',
@@ -261,17 +259,17 @@
                   '<span class="s">' + E(a.detail) + '</span></div></div>';
               }).join('') + '</div>'
             : '<div class="empty small">אין כרגע פריטים שדורשים טיפול.</div>'));
-      }
 
-      side.push(card('מכולות בדרך', (d.incoming || []).length + ' מכולות',
-        (d.incoming || []).length
-          ? '<div class="list">' + d.incoming.map(function (c) {
-              var note = [c.models || (c.vehicles + ' רכבים'), c.vessel]
-                .filter(Boolean).join(' · ');
-              var eta = c.eta ? etaText(c.eta) : c.status_he;
-              return listRow(c.container_number, note, eta);
-            }).join('') + '</div>'
-          : '<div class="empty small">אין מכולות פעילות במעקב.</div>'));
+        side.push(card('מכולות בדרך', (d.incoming || []).length + ' מכולות',
+          (d.incoming || []).length
+            ? '<div class="list">' + d.incoming.map(function (c) {
+                var note = [c.models || (c.vehicles + ' רכבים'), c.vessel]
+                  .filter(Boolean).join(' · ');
+                var eta = c.eta ? etaText(c.eta) : c.status_he;
+                return listRow(c.container_number, note, eta);
+              }).join('') + '</div>'
+            : '<div class="empty small">אין מכולות פעילות במעקב.</div>'));
+      }
     }
 
     document.getElementById('side-col').innerHTML = side.join('');
@@ -325,7 +323,6 @@
     }, 180);
   });
 
-  // רענון שקט כשחוזרים ללשונית, ובכל 5 דקות
   setInterval(function () { if (!document.hidden) load(true); }, REFRESH_MS);
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && state.data) {
