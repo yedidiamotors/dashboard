@@ -1,0 +1,67 @@
+/* ============================================================
+   ידידיה מוטורס — לוג משתמשים
+   ============================================================ */
+
+.filter-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.users-strip {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px;
+}
+.user-card {
+  border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+  background: var(--surface-card); cursor: pointer; display: flex; flex-direction: column; gap: 8px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.user-card:hover { border-color: var(--text-dim); }
+.user-card.is-active { border-color: var(--accent); background: var(--accent-tint); }
+.user-card .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.user-card .name { font-size: 15px; font-weight: 500; color: var(--text); }
+.user-card .role { font-size: 11.5px; color: var(--text-faint); }
+.user-card .seen { font-size: 12px; color: var(--text-fainter); }
+.user-card .seen.online { color: var(--accent-soft); }
+.user-card .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 2px; }
+.user-card .stat { display: flex; flex-direction: column; gap: 1px; }
+.user-card .stat b { font-size: 15px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+.user-card .stat span { font-size: 10.5px; color: var(--text-fainter); }
+
+.log-grid, .log-row {
+  display: grid; grid-template-columns: 130px 110px 96px 1fr 1.4fr; gap: 12px; align-items: center;
+}
+.log-row {
+  padding: 10px 22px; border-bottom: 1px solid var(--border-soft);
+  font-size: 13px; color: var(--text-mid);
+}
+.log-row .when { font-variant-numeric: tabular-nums; color: var(--text-body); white-space: nowrap; }
+.log-row .when small { display: block; font-size: 11px; color: var(--text-fainter); }
+.log-row .who { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log-row .what { color: var(--text-body); }
+.log-row .det { color: var(--text-faint); font-size: 12.5px; overflow-wrap: anywhere; }
+.log-row .det .mono { font-family: ui-monospace, monospace; font-size: 11.5px; unicode-bidi: plaintext; }
+
+.kind {
+  display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; white-space: nowrap;
+  border: 1px solid var(--border-chip); color: var(--text-mid);
+}
+.kind.login  { border-color: rgba(52,199,89,.45);  color: #7fd39b; }
+.kind.logout { border-color: rgba(255,255,255,.18); color: var(--text-faint); }
+.kind.view   { border-color: rgba(120,160,255,.45); color: #9db7ff; }
+.kind.action { border-color: rgba(200,16,46,.55);  color: var(--accent-soft); }
+.kind.deal   { border-color: rgba(255,190,60,.5);  color: #f2c66d; }
+
+.day-sep {
+  padding: 8px 22px; font-size: 11.5px; letter-spacing: .06em; color: var(--text-fainter);
+  background: var(--surface-thead); border-bottom: 1px solid var(--border-soft);
+}
+
+@media (max-width: 1180px) {
+  .log-grid, .log-row { grid-template-columns: 120px 100px 90px 1fr; }
+  .log-grid > :nth-child(5), .log-row > .det { display: none; }
+}
+@media (max-width: 760px) {
+  .log-grid { display: none; }
+  .log-row { grid-template-columns: 1fr auto; row-gap: 4px; padding: 10px 16px; }
+  .log-row > .who { display: none; }
+  .log-row > .det { display: block; grid-column: 1 / -1; }
+  .log-row .what::before { content: attr(data-who) " · "; color: var(--text-faint); }
+  .users-strip { grid-template-columns: 1fr; }
+}
