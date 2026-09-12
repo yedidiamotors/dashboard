@@ -75,6 +75,15 @@
 
   function roleHe(role) { return ROLE_HE[role] || role || '—'; }
 
+  // 972544480122 → 054-448-0122
+  function phoneHe(p) {
+    var d = String(p || '').replace(/\D/g, '');
+    if (d.indexOf('972') === 0) d = '0' + d.slice(3);
+    if (d.length === 10) return d.slice(0,3) + '-' + d.slice(3,6) + '-' + d.slice(6);
+    if (d.length === 9)  return d.slice(0,2) + '-' + d.slice(2,5) + '-' + d.slice(5);
+    return p || '—';
+  }
+
   function initials(name) {
     var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return '—';
@@ -115,6 +124,37 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  /* ---- ניווט משותף לכל המסכים ---- */
+  var NAV = [
+    { label: 'סקירה כללית',    href: 'index.html' },
+    { label: 'מלאי רכבים',      soon: true },
+    { label: 'הזמנות בדרך',     soon: true },
+    { label: 'לידים ולקוחות',   soon: true },
+    { label: 'עסקאות ומימון',   soon: true },
+    { label: 'מכולות ומכס',     soon: true },
+    { label: 'משתמשים והרשאות', href: 'users.html', perm: 'manage_staff_users' }
+  ];
+
+  function renderNav(containerId, currentHref, permissions) {
+    var host = document.getElementById(containerId);
+    if (!host) return;
+    var perms = permissions || [];
+    host.innerHTML = NAV.map(function (n) {
+      if (n.perm && perms.indexOf(n.perm) === -1) return '';
+      var active = n.href && n.href === currentHref;
+      var cls = 'nav-item' + (active ? ' is-active' : (n.soon ? ' is-soon' : ''));
+      return '<button class="' + cls + '" type="button" data-href="' + (n.href || '') + '"' +
+             (n.soon ? ' title="בבנייה"' : '') +
+             '><span class="dot"></span>' + escapeHtml(n.label) + '</button>';
+    }).join('');
+    host.querySelectorAll('.nav-item').forEach(function (b) {
+      var href = b.getAttribute('data-href');
+      if (href && !b.classList.contains('is-active')) {
+        b.addEventListener('click', function () { location.href = href; });
+      }
+    });
+  }
+
   global.YM = {
     API_BASE: API_BASE,
     api: api,
@@ -124,11 +164,13 @@
     clearSession: clearSession,
     logout: logout,
     roleHe: roleHe,
+    phoneHe: phoneHe,
     initials: initials,
     nis: nis,
     shortNis: shortNis,
     greetingFor: greetingFor,
     hhmm: hhmm,
-    escapeHtml: escapeHtml
+    escapeHtml: escapeHtml,
+    renderNav: renderNav
   };
 })(window);
