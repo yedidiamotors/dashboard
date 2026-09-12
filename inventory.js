@@ -153,10 +153,15 @@
 
     host.innerHTML = state.rows.map(function (v) {
       var hasPrice = v.total_landed_cost_estimate != null || v.purchase_price != null;
-      var priceTxt = hasPrice
-        ? YM.nis(v.total_landed_cost_estimate != null
-                 ? v.total_landed_cost_estimate : v.purchase_price)
-        : '—';
+      var priceTxt = '—';
+      if (v.total_landed_cost_estimate != null) {
+        priceTxt = YM.nis(v.total_landed_cost_estimate);
+      } else if (v.purchase_price != null) {
+        // מחיר רכישה נקוב במטבע הספק — לא להציג כשקלים
+        var cur = v.purchase_currency || 'ILS';
+        priceTxt = cur === 'ILS' ? YM.nis(v.purchase_price)
+          : cur + ' ' + Number(v.purchase_price).toLocaleString('en-US');
+      }
       var meta = [v.model_year, v.color, v.location,
                   v.days_in_stock + ' ימים', v.status_he].filter(Boolean).join(' · ');
       return '<div class="inv-row" data-ref="' + E(v.vin || v.id) + '">' +
