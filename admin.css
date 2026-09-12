@@ -109,21 +109,6 @@
   font-size: 10.5px; color: var(--text-fainter-2); text-align: center; display: block; margin-top: 3px;
 }
 
-/* ---------- חלון ---------- */
-.modal {
-  position: fixed; inset: 0; background: rgba(0,0,0,.66);
-  display: flex; align-items: flex-start; justify-content: center;
-  padding: 40px 20px; overflow-y: auto; z-index: 60;
-}
-.modal-box {
-  width: 100%; max-width: 460px; background: var(--surface-card);
-  border: 1px solid var(--border); border-radius: 10px; padding: 24px;
-}
-.modal-box h2 {
-  margin: 0 0 18px; font-family: Cinzel, serif; font-size: 20px;
-  font-weight: 400; color: var(--text);
-}
-.modal-box h3 { margin: 0 0 4px; font-size: 14px; font-weight: 500; color: var(--text); }
 #user-form { display: flex; flex-direction: column; gap: 15px; }
 #user-form .field { display: flex; flex-direction: column; gap: 6px; }
 #user-form label { font-size: 12.5px; color: var(--text-faint); }
@@ -134,13 +119,6 @@
 }
 #user-form input:focus, #user-form select:focus { border-color: var(--accent); }
 .hint { font-size: 11.5px; color: var(--text-fainter); line-height: 1.5; }
-.modal-actions { display: flex; gap: 10px; justify-content: flex-start; margin-top: 4px; }
-.btn-ghost {
-  height: 44px; padding: 0 17px; border-radius: 6px; cursor: pointer;
-  background: none; border: 1px solid var(--border-chip); color: var(--text-mid);
-  font-size: 13.5px;
-}
-.btn-ghost:hover { border-color: var(--text-dim); color: var(--text); }
 
 .overrides { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
 .ov-row {
