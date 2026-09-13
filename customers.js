@@ -238,7 +238,10 @@
       ' · נפתח ' + fmtDate(c.created_at) + (c.created_by_name ? ' ע"י ' + E(c.created_by_name) : '') + '</div>' +
       '<div class="tags"><span class="tag">' + E(YM.phoneHe(c.phone)) + '</span>' +
       (c.id_number ? '<span class="tag">ת.ז. ' + E(c.id_number) + '</span>' : '') +
-      (c.company_reg_number ? '<span class="tag">ח.פ ' + E(c.company_reg_number) + '</span>' : '') + '</div></div>';
+      (c.company_reg_number ? '<span class="tag">' + (c.company_reg_type === 'am' ? 'ע.מ ' : 'ח.פ ') + E(c.company_reg_number) + '</span>' : '') +
+      (c.address ? '<span class="tag">' + E(c.address) + '</span>' : '') +
+      (c.invoice_email ? '<span class="tag ltr">' + E(c.invoice_email) + '</span>' : '') + '</div>' +
+      (c.invoice_gaps && c.invoice_gaps.length ? '<div class="gap-note">חסר לחשבונית: ' + E(c.invoice_gaps.join(', ')) + ' — <button class="linkish" type="button" id="card-fix-invoice">להשלים</button></div>' : '') + '</div>';
 
     h += '<div class="card-tools">' +
       '<button class="btn-primary small" type="button" id="card-new-deal">עסקה חדשה</button>' +
@@ -251,8 +254,8 @@
 
     h += '<div class="sect"><h3>מסמכי לקוח קבועים</h3>' +
       (docs.length ? '<div class="docs">' + docs.map(function (x) {
-        return '<span class="doc">' + (x.drive_url ? '<a href="' + E(x.drive_url) + '" target="_blank" rel="noopener">' + E(x.doc_type_he) + '</a>' : E(x.doc_type_he)) +
-          (x.expires_at ? ' · עד ' + E(x.expires_at) : '') + '</span>';
+        return '<span class="doc' + (x.expired ? ' expired' : '') + '">' + (x.drive_url ? '<a href="' + E(x.drive_url) + '" target="_blank" rel="noopener">' + E(x.doc_type_he) + '</a>' : E(x.doc_type_he)) +
+          (x.expires_at ? (x.expired ? ' · פג תוקף ' : ' · בתוקף עד ') + E(x.expires_at) : '') + '</span>';
       }).join('') + '</div>' : '<div class="empty small">אין מסמכים קבועים עדיין.</div>') +
       (can('manage_customer_documents')
         ? '<div class="actions" style="margin-top:8px"><select class="small" id="cdoc-type">' + CUST_DOCS.map(function (x) {
@@ -292,15 +295,17 @@
     var h = '<div class="deal" data-id="' + E(d.id) + '">' +
       '<div class="head"><div class="veh">' + vehTxt + '</div><span class="deal-status ' + E(d.deal_status) + '">' + E(d.status_he) + '</span></div>' +
       '<div class="line">נפתחה ' + fmtDate(d.created_at) + (d.created_by_name ? ' · ' + E(d.created_by_name) : '') +
-        (!d.end_user_same_as_customer && d.end_user_name ? ' · נהג בפועל: ' + E(d.end_user_name) + (d.end_user_phone ? ' ' + E(YM.phoneHe(d.end_user_phone)) : '') : '') + '</div>';
+        (!d.end_user_same_as_customer && d.end_user_name ? ' · נהג בפועל: ' + E(d.end_user_name) + (d.end_user_phone ? ' ' + E(YM.phoneHe(d.end_user_phone)) : '') : '') +
+        (d.financing_required ? ' · במימון' + (d.financing_on_private_name ? ' (על שם פרטי)' : '') : '') +
+        (d.customer_docs && d.customer_docs.total ? ' · מסמכי לקוח ' + d.customer_docs.done + '/' + d.customer_docs.total : '') + '</div>';
     var docs = d.documents || [];
     h += '<div class="docs">' + docs.map(function (x) {
       var open = x.is_open_for_upload && !x.drive_url;
       return '<span class="doc' + (open ? ' open' : '') + '">' + (x.drive_url ? '<a href="' + E(x.drive_url) + '" target="_blank" rel="noopener">' + E(x.doc_type_he) + '</a>' : E(x.doc_type_he)) +
         (open ? ' · ממתין להעלאה' + (mine && !closed ? ' <button class="doc-up" type="button" data-doc="' + E(x.id) + '" data-type="' + E(x.doc_type) + '">העלאה</button>' : '') : '') + '</span>';
     }).join('') + '</div>';
-    if (v && d.deal_status !== 'cancelled') {
-      h += '<div class="checklist" data-deal="' + E(d.id) + '"><div class="cl-head"><span>רישוי ומסירה</span><button class="btn-icon cl-toggle" type="button">הצג checklist</button></div><div class="cl-body" hidden></div></div>';
+    if (d.deal_status !== 'cancelled') {
+      h += '<div class="checklist" data-deal="' + E(d.id) + '"><div class="cl-head"><span>מסמכי לקוח · רישוי ומסירה</span><button class="btn-icon cl-toggle" type="button">הצג checklist</button></div><div class="cl-body" hidden></div></div>';
     }
     if (mine) {
       h += '<div class="actions">';
@@ -333,6 +338,8 @@
     if (newDeal) newDeal.addEventListener('click', function () { openDealForm(res.customer, null); });
     var edit = document.getElementById('card-edit');
     if (edit) edit.addEventListener('click', function () { openCustomerForm(res.customer); });
+    var fix = document.getElementById('card-fix-invoice');
+    if (fix) fix.addEventListener('click', function () { openCustomerForm(res.customer); });
 
     body.querySelectorAll('.deal').forEach(function (el) {
       var id = el.getAttribute('data-id');
@@ -394,6 +401,13 @@
   document.querySelectorAll('#type-seg button').forEach(function (b) {
     b.addEventListener('click', function () { setCustomerType(b.getAttribute('data-type')); });
   });
+  function setRegType(t) {
+    cForm.company_reg_type.value = t;
+    document.querySelectorAll('#reg-seg button').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-reg') === t); });
+  }
+  document.querySelectorAll('#reg-seg button').forEach(function (b) {
+    b.addEventListener('click', function () { setRegType(b.getAttribute('data-reg')); });
+  });
 
   function openCustomerForm(c) {
     cForm.reset();
@@ -401,10 +415,12 @@
     cForm.id.value = c ? c.id : '';
     document.getElementById('customer-modal-title').textContent = c ? 'עריכת לקוח' : 'לקוח חדש';
     setCustomerType(c ? c.customer_type : 'individual');
+    setRegType(c && c.company_reg_type ? c.company_reg_type : 'hp');
     if (c) {
       cForm.full_name.value = c.full_name || ''; cForm.company_name.value = c.company_name || '';
       cForm.contact_person.value = c.contact_person || ''; cForm.phone.value = YM.phoneHe(c.phone) || '';
       cForm.id_number.value = c.id_number || ''; cForm.company_reg_number.value = c.company_reg_number || '';
+      cForm.address.value = c.address || ''; cForm.invoice_email.value = c.invoice_email || '';
     }
     hide('card-modal');
     show('customer-modal');
@@ -419,7 +435,8 @@
     var payload = {
       id: cForm.id.value || null, customer_type: cType,
       full_name: cForm.full_name.value, company_name: cForm.company_name.value, contact_person: cForm.contact_person.value,
-      phone: cForm.phone.value, id_number: cForm.id_number.value, company_reg_number: cForm.company_reg_number.value, force: force
+      phone: cForm.phone.value, id_number: cForm.id_number.value, company_reg_number: cForm.company_reg_number.value,
+      company_reg_type: cForm.company_reg_type.value, address: cForm.address.value, invoice_email: cForm.invoice_email.value, force: force
     };
     btn.disabled = true; btn.textContent = 'שומר…';
     var r;
@@ -471,9 +488,24 @@
   var dealEditId = null;
   var pickTimer;
 
-  dForm.end_user_same_as_customer.addEventListener('change', function () {
+  var dealCustomer = null;
+  function syncDealHints() {
     document.getElementById('end-user-fields').hidden = dForm.end_user_same_as_customer.checked;
-  });
+    document.getElementById('fin-private-wrap').hidden = !dForm.financing_required.checked;
+    if (!dForm.financing_required.checked) dForm.financing_on_private_name.checked = false;
+    var c = dealCustomer || {};
+    var priv = c.customer_type === 'individual' || !dForm.end_user_same_as_customer.checked;
+    var who = dForm.end_user_same_as_customer.checked ? (c.customer_type === 'company' ? 'החברה (' + (c.name || '') + ')' : 'הלקוח (' + (c.name || '') + ')') : 'הנהג בפועל (אדם פרטי)';
+    var need = ['פרטים לחשבונית'];
+    if (c.customer_type === 'company') need.push('אישור בעלי מניות + מורשה חתימה');
+    if (priv) need.push('צילום ת.ז של מי שהרכב נרשם על שמו');
+    if (dForm.financing_required.checked && dForm.financing_on_private_name.checked) need.push('ת.ז שני צדדים, רישיון נהיגה, ספח, פרטי אשראי');
+    need.push('בדיקת תוקף התעודות');
+    document.getElementById('reg-hint').textContent = 'הרכב יירשם על שם: ' + who + '. מסמכים שייפתחו ב-checklist: ' + need.join(' · ') + '.';
+  }
+  dForm.end_user_same_as_customer.addEventListener('change', syncDealHints);
+  dForm.financing_required.addEventListener('change', syncDealHints);
+  dForm.financing_on_private_name.addEventListener('change', syncDealHints);
 
   function openDealForm(customer, deal) {
     dForm.reset();
@@ -482,12 +514,15 @@
     document.getElementById('deal-modal-title').textContent = deal ? 'שיוך רכב לעסקה' : 'עסקה חדשה';
     document.getElementById('deal-customer-line').textContent = 'לקוח: ' + customer.name + ' · ' + YM.phoneHe(customer.phone);
     document.getElementById('deal-save').textContent = deal ? 'שמירה' : 'פתיחת עסקה';
+    dealCustomer = customer;
     if (deal) {
       dForm.end_user_same_as_customer.checked = deal.end_user_same_as_customer !== false;
       dForm.end_user_name.value = deal.end_user_name || ''; dForm.end_user_phone.value = deal.end_user_phone ? YM.phoneHe(deal.end_user_phone) : '';
       dForm.end_user_id_number.value = deal.end_user_id_number || '';
+      dForm.financing_required.checked = !!deal.financing_required;
+      dForm.financing_on_private_name.checked = !!deal.financing_on_private_name;
     }
-    document.getElementById('end-user-fields').hidden = dForm.end_user_same_as_customer.checked;
+    syncDealHints();
     setPicked(null);
     document.getElementById('veh-list').innerHTML = '';
     hide('card-modal');
@@ -537,6 +572,7 @@
       end_user_same_as_customer: dForm.end_user_same_as_customer.checked,
       end_user_name: dForm.end_user_name.value, end_user_phone: dForm.end_user_phone.value, end_user_id_number: dForm.end_user_id_number.value,
       vehicle_file_id: dForm.vehicle_file_id.value || null,
+      financing_required: dForm.financing_required.checked, financing_on_private_name: dForm.financing_on_private_name.checked,
       sale_price: dForm.sale_price.value ? Number(String(dForm.sale_price.value).replace(/[^\d.]/g, '')) : null
     };
     btn.disabled = true; btn.textContent = 'שומר…';
@@ -555,23 +591,28 @@
     try { r = await YM.api('/deals/checklist', { token: session.token, deal_id: dealId }); }
     catch (err) { body.innerHTML = '<div class="empty small">' + E(err.message) + '</div>'; return; }
     if (r.ok !== true) { body.innerHTML = '<div class="empty small">' + E(r.message_he || 'לא ניתן לטעון.') + '</div>'; return; }
-    if (!r.items.length) { body.innerHTML = '<div class="empty small">' + E(r.message_he || 'אין דרישות.') + '</div>'; return; }
-    var pct = r.total ? Math.round(100 * r.done / r.total) : 0;
-    var h = '<div class="cl-progress"><div class="bar"><span style="width:' + pct + '%"></span></div>' +
-      '<div class="txt">' + r.done + ' / ' + r.total + ' אומתו · הרכב: ' + E(r.vehicle_status_he) + (r.licensing_completed ? ' · <b>הרישוי הושלם</b>' : '') + '</div></div>';
-    h += r.items.map(function (it) {
-      return '<div class="cl-item st-' + E(it.status) + '" data-id="' + E(it.id) + '">' +
-        '<div class="cl-main"><div class="cl-label">' + E(it.label_he) + (it.is_open_for_upload ? ' <span class="doc open">פתוח ללקוח</span>' : '') + '</div>' +
-          (it.description ? '<div class="cl-desc">' + E(it.description) + '</div>' : '') +
-          (it.notes ? '<div class="cl-notes">' + E(it.notes) + '</div>' : '') + '</div>' +
-        (editable
-          ? '<div class="cl-ctl"><select class="small cl-status">' +
-              [['missing','חסר'],['received','התקבל'],['verified','אומת']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === it.status ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
-            '</select><button class="btn-icon cl-note" type="button" title="הערה">✎</button>' +
-            (can('open_document_request') && !it.is_open_for_upload ? '<button class="btn-icon cl-open" type="button" title="לבקש מהלקוח">בקש מהלקוח</button>' : '') + '</div>'
-          : '<div class="cl-ctl"><span class="doc">' + E(it.status_he) + '</span></div>') +
-      '</div>';
-    }).join('');
+    var h = '';
+    var ci = r.customer_items || [];
+    if (ci.length) {
+      var cpct = r.customer_total ? Math.round(100 * r.customer_done / r.customer_total) : 0;
+      h += '<div class="cl-group"><div class="cl-title">מסמכי לקוח' +
+        (r.context && r.context.registered_to_private ? ' · רישום על שם פרטי' : ' · רישום על שם החברה') +
+        (r.context && r.context.financing_required ? ' · מימון' + (r.context.financing_on_private_name ? ' על שם פרטי' : '') : '') + '</div>' +
+        '<div class="cl-progress"><div class="bar"><span style="width:' + cpct + '%"></span></div>' +
+        '<div class="txt">' + r.customer_done + ' / ' + r.customer_total + ' אומתו' + (r.customer_docs_completed ? ' · <b>כל מסמכי הלקוח אומתו</b>' : '') +
+        (r.invoice_gaps && r.invoice_gaps.length ? ' · חסר לחשבונית: ' + E(r.invoice_gaps.join(', ')) : '') + '</div></div>' +
+        ci.map(function (it) { return itemHtml(it, editable); }).join('') + '</div>';
+    }
+    var vi = r.items || [];
+    h += '<div class="cl-group"><div class="cl-title">רישוי ומסירה</div>';
+    if (!vi.length) h += '<div class="empty small">' + E(r.message_he || 'אין דרישות.') + '</div>';
+    else {
+      var pct = r.total ? Math.round(100 * r.done / r.total) : 0;
+      h += '<div class="cl-progress"><div class="bar"><span style="width:' + pct + '%"></span></div>' +
+        '<div class="txt">' + r.done + ' / ' + r.total + ' אומתו · הרכב: ' + E(r.vehicle_status_he) + (r.licensing_completed ? ' · <b>הרישוי הושלם</b>' : '') + '</div></div>' +
+        vi.map(function (it) { return itemHtml(it, editable); }).join('');
+    }
+    h += '</div>';
     body.innerHTML = h;
     body.querySelectorAll('.cl-item').forEach(function (row) {
       var rid = row.getAttribute('data-id');
@@ -588,13 +629,41 @@
     });
   }
 
+  function itemHtml(it, editable) {
+    return '<div class="cl-item st-' + E(it.status) + '" data-id="' + E(it.id) + '">' +
+      '<div class="cl-main"><div class="cl-label">' + E(it.label_he) + (it.is_open_for_upload ? ' <span class="doc open">פתוח ללקוח</span>' : '') + '</div>' +
+        (it.description ? '<div class="cl-desc">' + E(it.description) + '</div>' : '') +
+        (it.notes ? '<div class="cl-notes">' + E(it.notes) + '</div>' : '') + '</div>' +
+      (editable
+        ? '<div class="cl-ctl"><select class="small cl-status">' +
+            [['missing','חסר'],['received','התקבל'],['verified','אומת']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === it.status ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+          '</select><button class="btn-icon cl-note" type="button" title="הערה">✎</button>' +
+          (can('open_document_request') && !it.is_open_for_upload && it.key !== 'invoice_details' && it.key !== 'documents_validity' ? '<button class="btn-icon cl-open" type="button" title="לבקש מהלקוח">בקש מהלקוח</button>' : '') + '</div>'
+        : '<div class="cl-ctl"><span class="doc">' + E(it.status_he) + '</span></div>') +
+    '</div>';
+  }
+
   async function setRequirement(dealId, body, editable, payload) {
     payload.token = session.token;
     var r;
     try { r = await YM.api('/deals/requirement', payload); } catch (err) { r = { ok: false, message_he: err.message }; }
     notice(r.message_he || (r.ok ? 'עודכן.' : 'העדכון נכשל.'), r.ok ? 'ok' : 'err');
     loadChecklist(dealId, body, editable);
-    if (r.ok && r.licensing_completed) load(false);
+    if (r.ok && (r.licensing_completed || r.scope === 'customer')) openCardQuiet();
+  }
+
+  // רענון שקט של כותרות העסקאות בכרטיס (ספירת מסמכי לקוח) בלי לסגור את ה-checklist הפתוח
+  async function openCardQuiet() {
+    var r; try { r = await YM.api('/customers/card', { token: session.token, id: state.cardId }); } catch (e) { return; }
+    if (!r || r.ok !== true) return;
+    state.card = r;
+    (r.deals || []).forEach(function (d) {
+      var el = document.querySelector('.deal[data-id="' + d.id + '"] .line');
+      if (el && d.customer_docs && d.customer_docs.total) {
+        el.innerHTML = el.innerHTML.replace(/ · מסמכי לקוח \d+\/\d+/, '') + ' · מסמכי לקוח ' + d.customer_docs.done + '/' + d.customer_docs.total;
+      }
+    });
+    load(false);
   }
 
   /* ---------- העלאת קבצים ל-Drive ---------- */
