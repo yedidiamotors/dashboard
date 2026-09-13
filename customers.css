@@ -234,3 +234,8 @@
 }
 #apv-warn .banner { margin-bottom: 8px; }
 @media (max-width: 760px) { .terms-grid { grid-template-columns: 1fr 1fr; } }
+
+/* ---- מי העסקה רשומה עליו ---- */
+.deal .owner-line { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 2px; }
+.deal .owner-line b { color: var(--text-body); font-weight: 500; }
+.deal .owner-line select.small { max-width: 180px; }

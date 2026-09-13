@@ -299,6 +299,7 @@
         (!d.end_user_same_as_customer && d.end_user_name ? ' · נהג בפועל: ' + E(d.end_user_name) + (d.end_user_phone ? ' ' + E(YM.phoneHe(d.end_user_phone)) : '') : '') +
         (d.financing_required ? ' · במימון' + (d.financing_on_private_name ? ' (על שם פרטי)' : '') : '') +
         (d.customer_docs && d.customer_docs.total ? ' · מסמכי לקוח ' + d.customer_docs.done + '/' + d.customer_docs.total : '') + '</div>';
+    h += ownerHtml(d);
     var docs = d.documents || [];
     h += '<div class="docs">' + docs.map(function (x) {
       var open = x.is_open_for_upload && !x.drive_url;
@@ -329,6 +330,24 @@
       h += '</div>';
     }
     return h + '</div>';
+  }
+
+  /* מי העסקה רשומה עליו. השיוך נקבע אוטומטית למי שפתח אותה;
+     מנהל יכול להעביר אותה לאיש מכירות אחר, וההעברה נרשמת בלוג. */
+  function ownerHtml(d) {
+    var card = state.card || {};
+    var name = d.sales_owner_name || 'לא משויכת';
+    if (!card.can_assign_owner) {
+      return '<div class="line owner-line">רשומה על <b>' + E(name) + '</b></div>';
+    }
+    var opts = (card.staff_options || []).map(function (s) {
+      return '<option value="' + E(s.id) + '"' +
+        (s.id === d.sales_owner_staff_id ? ' selected' : '') + '>' + E(s.name) + '</option>';
+    }).join('');
+    return '<div class="line owner-line"><span>רשומה על</span>' +
+      '<select class="small deal-owner-sel" aria-label="איש המכירות שהעסקה רשומה עליו">' +
+      (d.sales_owner_staff_id ? '' : '<option value="">— לא משויכת —</option>') +
+      opts + '</select></div>';
   }
 
   /* ---------- תנאים מסחריים והסכם מכירה ---------- */
@@ -449,6 +468,18 @@
         notice(r.message_he || (r.ok ? 'עודכן.' : 'העדכון נכשל.'), r.ok ? 'ok' : 'err');
         openCard(state.cardId); load(false);
       });
+      var ownerSel = el.querySelector('.deal-owner-sel');
+      if (ownerSel) {
+        var ownerWas = ownerSel.value;
+        ownerSel.addEventListener('change', async function () {
+          if (!ownerSel.value) { ownerSel.value = ownerWas; return; }
+          ownerSel.disabled = true;
+          var r = await YM.api('/deal/owner', { token: session.token, deal_id: id, staff_id: ownerSel.value });
+          notice(r.message_he || (r.ok ? 'עודכן.' : 'העדכון נכשל.'), r.ok ? 'ok' : 'err');
+          if (!r.ok) { ownerSel.value = ownerWas; ownerSel.disabled = false; return; }
+          openCard(state.cardId);
+        });
+      }
       var docSel = el.querySelector('.deal-doc-sel');
       if (docSel) docSel.addEventListener('change', async function () {
         if (!docSel.value) return;

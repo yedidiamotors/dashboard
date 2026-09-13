@@ -108,17 +108,11 @@
             (d.kpis.delivered_total || 0) + ' נמסרו עד היום</div>' +
         '</div>';
     } else if (isSales) {
-      var delivered = d.kpis.my_deliveries_this_month;
-      var goal = 10;
+      // בלי יעד פיקטיבי: המספר האמיתי, וההשוואה לחודש שעבר בכרטיס "הביצועים שלי"
       box.innerHTML =
         '<div class="stat-box">' +
-          '<div class="label">היעד שלי החודש</div>' +
-          '<div style="display:flex;align-items:baseline;gap:6px">' +
-            '<span class="stat-figure">' + delivered + '</span>' +
-            '<span style="font-size:13px;color:var(--text-faint)">מתוך ' + goal + ' מסירות</span>' +
-          '</div>' +
-          '<div class="bar-track"><div class="bar-fill" style="width:' +
-            Math.min(100, Math.round(delivered / goal * 100)) + '%"></div></div>' +
+          '<div class="label">המכירות שלי החודש</div>' +
+          '<div class="stat-figure">' + d.kpis.my_deliveries_this_month + '</div>' +
           '<div class="stat-note">' + d.kpis.my_open_deals + ' עסקאות פתוחות בטיפולי</div>' +
         '</div>';
     } else {
@@ -132,8 +126,9 @@
 
     /* מדדים */
     var kpis = isSales ? [
-      { label: 'מסירות שלי החודש', value: d.kpis.my_deliveries_this_month, unit: 'מתוך יעד 10',
-        delta: Math.round(d.kpis.my_deliveries_this_month / 10 * 100) + '%', note: 'מהיעד החודשי' },
+      // אין יעד חודשי מוגדר במערכת — מציגים את המספר האמיתי ואת ההשוואה לחודש שעבר בכרטיס "הביצועים שלי"
+      { label: 'מכירות שלי החודש', value: d.kpis.my_deliveries_this_month, unit: 'עסקאות',
+        delta: '', note: 'מהעסקאות הרשומות עליי' },
       { label: 'עסקאות פתוחות שלי', value: d.kpis.my_open_deals, unit: 'עסקאות',
         delta: '', note: 'בטיפול פעיל' },
       { label: 'לידים פתוחים', value: d.kpis.open_leads, unit: 'פניות',
