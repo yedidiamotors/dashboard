@@ -113,7 +113,6 @@
     if (v.quota_request_number) meta.push('<span class="tag">מכסה ' + E(v.quota_request_number) + '</span>');
     if (v.requested_customer_name) meta.push('<span class="tag ok">מבוקש: ' + E(v.requested_customer_name) + '</span>');
     if (v.customs && v.customs.total) meta.push('<span class="tag' + (v.customs.done === v.customs.total ? ' ok' : '') + '">מכס ' + v.customs.done + '/' + v.customs.total + '</span>');
-    if (v.documents) meta.push('<span class="tag">' + v.documents + ' מסמכים</span>');
     if (!v.vin_decoded) meta.push('<span class="tag warn">VIN לא פוענח</span>');
     meta.push('<span class="tag">' + v.days_in_stage + ' ימים בשלב</span>');
 
@@ -130,11 +129,21 @@
     }
     acts += '<button class="btn-icon" type="button" data-act="open">תיק הרכב</button>';
 
+    var docs = (v.document_list || []).map(function (d) {
+      var label = E(d.doc_type_he || d.doc_type || 'מסמך') + (d.filename ? ' · <span class="ltr">' + E(d.filename) + '</span>' : '');
+      return d.drive_url
+        ? '<a class="doc" href="' + E(d.drive_url) + '" target="_blank" rel="noopener" title="' + E(d.filename || '') + '">' + label + '</a>'
+        : '<span class="doc">' + label + '</span>';
+    }).join('');
+    var docsHtml = docs
+      ? '<div class="docs"><span class="docs-l">מסמכי התיק (' + (v.document_list || []).length + ')</span>' + docs + '</div>'
+      : '<div class="docs"><span class="docs-l empty-docs">אין עדיין מסמכים בתיק</span></div>';
+
     return '<div class="veh" data-id="' + E(v.id) + '">' +
       '<div class="thumb"><span>' + E(v.vin_tail || '—') + '</span></div>' +
       '<div><div class="title">' + E(v.title || '—') + '</div>' +
         '<div class="sub">' + E([v.model_year, v.trim, v.color, v.vin ? 'VIN ' + v.vin : null].filter(Boolean).join(' · ')) + '</div>' +
-        '<div class="meta">' + meta.join('') + '</div></div>' +
+        '<div class="meta">' + meta.join('') + '</div>' + docsHtml + '</div>' +
       '<div class="actions"><div class="row">' + acts + '</div></div>' +
       '<div class="cl" hidden></div>' +
     '</div>';
