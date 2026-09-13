@@ -19,6 +19,8 @@
     ['financing_agreement', 'הסכם מימון'], ['trade_in_agreement', 'הסכם טרייד-אין'],
     ['signed_order_form', 'טופס הזמנה חתום'], ['other', 'אחר']
   ];
+  var CUST_DOCS = [['id_card', 'תעודת זהות'], ['drivers_license', 'רישיון נהיגה'], ['company_registration', 'תעודת התאגדות'],
+                   ['power_of_attorney', 'ייפוי כוח'], ['other', 'אחר']];
   var DEAL_STATUSES = [['open', 'פתוחה'], ['pending_signatures', 'ממתינה לחתימות'], ['completed', 'הושלמה'], ['cancelled', 'בוטלה']];
 
   load(true);
@@ -150,7 +152,12 @@
       (docs.length ? '<div class="docs">' + docs.map(function (x) {
         return '<span class="doc">' + (x.drive_url ? '<a href="' + E(x.drive_url) + '" target="_blank" rel="noopener">' + E(x.doc_type_he) + '</a>' : E(x.doc_type_he)) +
           (x.expires_at ? ' · עד ' + E(x.expires_at) : '') + '</span>';
-      }).join('') + '</div>' : '<div class="empty small">אין מסמכים. צירוף ת.ז./רישיון נעשה דרך בוט הוואטסאפ ("הוספת רישיון") או מהעמוד האישי של הלקוח.</div>') + '</div>';
+      }).join('') + '</div>' : '<div class="empty small">אין מסמכים קבועים עדיין.</div>') +
+      (can('manage_customer_documents')
+        ? '<div class="actions" style="margin-top:8px"><select class="small" id="cdoc-type">' + CUST_DOCS.map(function (x) {
+            return '<option value="' + x[0] + '">' + x[1] + '</option>';
+          }).join('') + '</select><button class="btn-icon" type="button" id="cdoc-up">צירוף קובץ ללקוח</button></div>'
+        : '') + '</div>';
 
     if (wait.length) {
       h += '<div class="sect"><h3>רשימת המתנה</h3><div class="docs">' + wait.map(function (w) {
@@ -188,11 +195,15 @@
     var docs = d.documents || [];
     h += '<div class="docs">' + docs.map(function (x) {
       var open = x.is_open_for_upload && !x.drive_url;
-      return '<span class="doc' + (open ? ' open' : '') + '">' + (x.drive_url ? '<a href="' + E(x.drive_url) + '" target="_blank" rel="noopener">' + E(x.doc_type_he) + '</a>' : E(x.doc_type_he)) + (open ? ' · ממתין להעלאה' : '') + '</span>';
+      return '<span class="doc' + (open ? ' open' : '') + '">' + (x.drive_url ? '<a href="' + E(x.drive_url) + '" target="_blank" rel="noopener">' + E(x.doc_type_he) + '</a>' : E(x.doc_type_he)) +
+        (open ? ' · ממתין להעלאה' + (mine && !closed ? ' <button class="doc-up" type="button" data-doc="' + E(x.id) + '" data-type="' + E(x.doc_type) + '">העלאה</button>' : '') : '') + '</span>';
     }).join('') + '</div>';
     if (mine) {
       h += '<div class="actions">';
       if (!closed) {
+        h += '<select class="small deal-up-sel" aria-label="העלאת מסמך"><option value="">העלאת מסמך…</option>' + DEAL_DOCS.map(function (x) {
+          return '<option value="' + x[0] + '">' + x[1] + '</option>';
+        }).join('') + '</select>';
         h += '<select class="small deal-status-sel" aria-label="שינוי סטטוס">' + DEAL_STATUSES.map(function (s) {
           return '<option value="' + s[0] + '"' + (s[0] === d.deal_status ? ' selected' : '') + '>' + s[1] + '</option>';
         }).join('') + '</select>';
@@ -210,6 +221,10 @@
 
   function bindCard(res) {
     var body = document.getElementById('card-body');
+    var cdocUp = document.getElementById('cdoc-up');
+    if (cdocUp) cdocUp.addEventListener('click', function () {
+      pickFile({ scope: 'customer', target_id: res.customer.id, document_id: null, doc_type: document.getElementById('cdoc-type').value });
+    });
     var newDeal = document.getElementById('card-new-deal');
     if (newDeal) newDeal.addEventListener('click', function () { openDealForm(res.customer, null); });
     var edit = document.getElementById('card-edit');
@@ -233,6 +248,17 @@
         var r = await YM.api('/deals/document-request', { token: session.token, deal_id: id, doc_type: docSel.value });
         notice(r.message_he || (r.ok ? 'נפתחה בקשה.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
         openCard(state.cardId);
+      });
+      el.querySelectorAll('.doc-up').forEach(function (b) {
+        b.addEventListener('click', function () {
+          pickFile({ scope: 'deal', target_id: id, document_id: b.getAttribute('data-doc'), doc_type: b.getAttribute('data-type') });
+        });
+      });
+      var upSel = el.querySelector('.deal-up-sel');
+      if (upSel) upSel.addEventListener('change', function () {
+        if (!upSel.value) return;
+        pickFile({ scope: 'deal', target_id: id, document_id: null, doc_type: upSel.value });
+        upSel.value = '';
       });
       var assign = el.querySelector('.deal-assign');
       if (assign) assign.addEventListener('click', function () {
@@ -393,6 +419,32 @@
     btn.disabled = false; btn.textContent = dealEditId ? 'שמירה' : 'פתיחת עסקה';
     notice(r.message_he || (r.ok ? 'נשמר.' : 'השמירה נכשלה.'), r.ok ? 'ok' : 'err');
     if (r.ok) { hide('deal-modal'); await load(false); openCard(dForm.customer_id.value); }
+  });
+
+  /* ---------- העלאת קבצים ל-Drive ---------- */
+  var fileInput = document.getElementById('file-input');
+  var pendingUpload = null;
+  function pickFile(ctx) { pendingUpload = ctx; fileInput.value = ''; fileInput.click(); }
+  fileInput.addEventListener('change', async function () {
+    var f = fileInput.files && fileInput.files[0];
+    if (!f || !pendingUpload) return;
+    if (f.size > 15 * 1024 * 1024) { notice('הקובץ גדול מדי (עד 15MB).', 'err'); return; }
+    notice('מעלה את "' + f.name + '"…', 'info');
+    var fd = new FormData();
+    fd.append('token', session.token);
+    fd.append('scope', pendingUpload.scope);
+    fd.append('target_id', pendingUpload.target_id);
+    if (pendingUpload.document_id) fd.append('document_id', pendingUpload.document_id);
+    fd.append('doc_type', pendingUpload.doc_type);
+    fd.append('file', f, f.name);
+    var r;
+    try {
+      var resp = await fetch(YM.API_BASE + '/documents/upload', { method: 'POST', body: fd });
+      r = await resp.json().catch(function () { return { ok: false, message_he: 'תשובה לא תקינה מהשרת.' }; });
+    } catch (err) { r = { ok: false, message_he: 'אין תקשורת עם השרת.' }; }
+    notice(r.message_he || (r.ok ? 'הועלה.' : 'ההעלאה נכשלה.'), r.ok ? 'ok' : 'err');
+    if (r.ok) { openCard(state.cardId); load(false); }
+    pendingUpload = null;
   });
 
   /* ---------- חלונות ---------- */
