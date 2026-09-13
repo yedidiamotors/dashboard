@@ -1,0 +1,145 @@
+/* ============================================================
+   ידידיה מוטורס — לקוחות ועסקאות
+   ============================================================ */
+
+.filter-bar { display: flex; flex-direction: column; gap: 8px; }
+.filter-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.cust-grid, .cust-row {
+  display: grid; grid-template-columns: 1.5fr 120px 120px 90px 1.4fr 80px; gap: 10px; align-items: center;
+}
+.cust-row {
+  padding: 12px 22px; border-bottom: 1px solid var(--border-soft); cursor: pointer;
+  font-size: 13.5px; color: var(--text-mid); transition: background 120ms ease;
+}
+.cust-row:hover { background: var(--hover-row); }
+.cust-row .c-name { color: var(--text); font-weight: 500; font-size: 14.5px; }
+.cust-row .c-sub { font-size: 12px; color: var(--text-faint); }
+.cust-row .ltr { direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+.cust-row .c-meta { display: none; font-size: 12px; color: var(--text-fainter-2); }
+.badge {
+  display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; margin-inline-start: 6px;
+  border: 1px solid var(--border-chip); color: var(--text-faint); vertical-align: middle;
+}
+.badge.company { border-color: rgba(120,160,255,.45); color: #9db7ff; }
+
+/* ---------- טפסים ---------- */
+.form { display: flex; flex-direction: column; gap: 15px; }
+.form .field { display: flex; flex-direction: column; gap: 6px; }
+.form label { font-size: 12.5px; color: var(--text-faint); }
+.form input, .form select {
+  height: 42px; padding: 0 12px; border-radius: 6px; background: #101216;
+  border: 1px solid var(--border-input); color: var(--text-body); font-size: 14px; outline: none;
+  transition: border-color 120ms ease;
+}
+.form input:focus, .form select:focus { border-color: var(--accent); }
+.form .check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-body); cursor: pointer; }
+.form .check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.form .sub { font-size: 13.5px; color: var(--text-faint); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hint { font-size: 11.5px; color: var(--text-fainter); line-height: 1.5; }
+.seg { display: flex; border: 1px solid var(--border-chip); border-radius: 6px; overflow: hidden; width: fit-content; }
+.seg button {
+  background: none; border: 0; color: var(--text-dim); padding: 9px 14px; font-size: 13px; cursor: pointer;
+}
+.seg button.is-active { background: var(--accent); color: #fff; }
+
+.dup-box {
+  border: 1px solid rgba(226,180,87,.45); border-radius: 8px; padding: 12px 14px; background: rgba(226,180,87,.06);
+  display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--text-body);
+}
+.dup-box .list-row { padding: 6px 0; border-top: 1px solid var(--border-soft); }
+.dup-box .row-actions { display: flex; gap: 6px; }
+
+/* בוחר רכב */
+.picker { display: flex; flex-direction: column; gap: 6px; }
+.picker-list { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; border-radius: 6px; }
+.picker-list:empty { display: none; }
+.pick {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 9px 12px;
+  background: var(--surface-raised); border: 1px solid var(--border-soft); border-top: 0; cursor: pointer; font-size: 13px;
+}
+.pick:first-child { border-top: 1px solid var(--border-soft); }
+.pick:hover { background: var(--hover-row); }
+.pick .t { color: var(--text); unicode-bidi: plaintext; }
+.pick .s { font-size: 11.5px; color: var(--text-faint); }
+.picked {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border: 1px solid rgba(200,16,46,.45); background: var(--accent-tint); border-radius: 6px; padding: 9px 12px; font-size: 13.5px;
+}
+.picked .t { color: var(--text); unicode-bidi: plaintext; }
+
+/* ---------- כרטיס לקוח ---------- */
+.modal-box.wide { max-width: 720px; position: relative; }
+.modal-x {
+  position: absolute; inset-inline-end: 18px; top: 16px; background: none; border: 0;
+  color: var(--text-dim); font-size: 26px; line-height: 1; cursor: pointer; padding: 0 4px;
+}
+.modal-x:hover { color: var(--text); }
+.card-head-c { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; padding-inline-end: 36px; }
+.card-head-c h2 { margin: 0; font-family: Cinzel, serif; font-size: 22px; font-weight: 400; color: var(--text); }
+.card-head-c .sub { font-size: 13.5px; color: var(--text-faint); }
+.card-head-c .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.card-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.btn-ghost.small { height: 34px; padding: 0 12px; font-size: 12.5px; }
+.btn-icon {
+  background: none; border: 1px solid var(--border-chip); border-radius: 5px;
+  color: var(--text-dim); cursor: pointer; font-size: 12px; padding: 5px 10px;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+.btn-icon:hover { border-color: var(--accent); color: var(--text); }
+.btn-icon.danger:hover { border-color: var(--accent); color: var(--accent-soft); }
+.btn-icon:disabled { opacity: .35; cursor: not-allowed; }
+.btn-primary.small { height: 34px; padding: 0 14px; font-size: 12.5px; }
+
+.sect { margin-top: 18px; }
+.sect > h3 { margin: 0 0 10px; font-size: 11.5px; letter-spacing: .08em; color: var(--text-fainter); font-weight: 400; }
+.kv { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 18px; }
+.kv > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kv .k { font-size: 11.5px; color: var(--text-fainter); }
+.kv .v { font-size: 14px; color: var(--text-body); unicode-bidi: plaintext; text-align: right; overflow-wrap: anywhere; }
+
+.deal {
+  border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; background: var(--surface-raised);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.deal .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.deal .veh { font-size: 14.5px; color: var(--text); unicode-bidi: plaintext; }
+.deal .veh small { display: block; font-size: 12px; color: var(--text-faint); }
+.deal .line { font-size: 12.5px; color: var(--text-faint); }
+.deal .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.deal select.small { height: 32px; font-size: 12.5px; padding: 0 8px; }
+.docs { display: flex; flex-wrap: wrap; gap: 6px; }
+.doc {
+  font-size: 11.5px; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border-chip); color: var(--text-mid);
+}
+.doc.open { border-style: dashed; color: var(--warn); border-color: rgba(226,180,87,.5); }
+.doc a { color: inherit; text-decoration: none; }
+
+.timeline { display: flex; flex-direction: column; }
+.tl {
+  display: grid; grid-template-columns: 110px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border-soft);
+  font-size: 12.5px; color: var(--text-mid);
+}
+.tl .t { color: var(--text-fainter); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tl .mono { font-family: ui-monospace, monospace; font-size: 11.5px; unicode-bidi: plaintext; }
+
+.deal-status { font-size: 11.5px; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border-chip); color: var(--text-mid); white-space: nowrap; }
+.deal-status.open { border-color: rgba(120,160,255,.45); color: #9db7ff; }
+.deal-status.pending_signatures { border-color: rgba(226,180,87,.5); color: var(--warn); }
+.deal-status.completed { border-color: rgba(127,192,138,.45); color: var(--ok); }
+.deal-status.cancelled { color: var(--text-fainter); }
+
+@media (max-width: 1180px) {
+  .cust-grid, .cust-row { grid-template-columns: 1.5fr 120px 90px 1.2fr; }
+  .cust-grid > :nth-child(3), .cust-grid > :nth-child(6), .cust-row > .c-id, .cust-row > .c-docs { display: none; }
+}
+@media (max-width: 760px) {
+  .cust-grid { display: none; }
+  .cust-row { grid-template-columns: 1fr auto; padding: 12px 16px; row-gap: 4px; }
+  .cust-row > .c-phone, .cust-row > .c-last { display: none; }
+  .cust-row .c-meta { display: block; grid-column: 1 / -1; }
+  .grid2 { grid-template-columns: 1fr; }
+  .kv { grid-template-columns: 1fr; }
+  .tl { grid-template-columns: 1fr; gap: 2px; }
+}
