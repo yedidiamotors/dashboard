@@ -53,7 +53,13 @@
     render();
     document.getElementById('boot').hidden = true;
     document.getElementById('shell').hidden = false;
+    if (reset && !deepLinked) {
+      deepLinked = true;
+      var ref = new URLSearchParams(location.search).get('ref');
+      if (ref) openCard(ref);
+    }
   }
+  var deepLinked = false;
 
   function bootError(text) {
     var boot = document.getElementById('boot');
