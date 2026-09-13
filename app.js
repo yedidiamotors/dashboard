@@ -305,8 +305,8 @@
     var months = perf.months || [];
     var cur  = months[months.length - 1] || { opened: 0, sold: 0, revenue: 0 };
     var prev = months[months.length - 2] || { opened: 0, sold: 0, revenue: 0 };
-    var me   = perf.staff && perf.staff.is_me;
-    var title = me ? 'הביצועים שלי' : 'הביצועים של ' + (perf.staff.name || '');
+    var st   = perf.staff || {};
+    var title = st.is_me === false ? 'הביצועים של ' + (st.name || 'איש הצוות') : 'הביצועים שלי';
 
     var max = months.reduce(function (m, x) { return Math.max(m, x.opened, x.sold); }, 0) || 1;
     var bars = '<div class="perf-bars">' + months.map(function (x) {
@@ -342,7 +342,7 @@
         ((perf.all_time || {}).sold || 0) + ' נמכרו · ' +
         ((perf.all_time || {}).open_now || 0) + ' פתוחות עכשיו</div>';
 
-    var h = card(title, perf.staff && perf.staff.name ? '' : '', inner);
+    var h = card(title, '', inner);
 
     if (perf.can_view_team && (perf.team || []).length) {
       var rows = perf.team.map(function (t) {

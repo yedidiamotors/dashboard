@@ -11,6 +11,7 @@
   var session = YM.getSession();
   if (!session) { location.replace('login.html'); return; }
 
+
   boot();
 
   async function boot() {
@@ -28,6 +29,57 @@
     renderUsers();
     document.getElementById('boot').hidden = true;
     document.getElementById('shell').hidden = false;
+    loadLockouts();
+  }
+
+  /* ---------- נעילות כניסה ----------
+     חמישה ניסיונות קוד שגויים או שלוש בקשות קוד בעשר דקות נועלים ל-15 דקות.
+     מנהל כללי ומנהל מכירות יכולים לשחרר — עד 3 פעמים לאותו משתמש ב-24 שעות. */
+  async function loadLockouts() {
+    var host = document.getElementById('lockouts');
+    if (!host) return;
+    host.innerHTML = '<div class="card pad lockouts"><div class="lk-head">' +
+      '<h2>נעילות כניסה</h2><span class="card-count">בודק…</span></div></div>';
+
+    var res = await call('/admin/lockouts', {}, true);
+    if (!res) { host.innerHTML = ''; return; }
+
+    var rows = res.lockouts || [];
+    host.innerHTML = '<div class="card pad lockouts">' +
+      '<div class="lk-head"><h2>נעילות כניסה</h2>' +
+        '<button class="btn-icon" type="button" id="lk-refresh">רענון</button></div>' +
+      (rows.length
+        ? rows.map(function (l) {
+            return '<div class="lk-row">' +
+              '<div class="lines"><span class="t">' + E(l.name || '—') + '</span>' +
+              '<span class="s">' + E(l.reason_he) + ' · נעול עד ' + E(hhmm(l.locked_until)) +
+                (l.unlocks_today ? ' · ' + l.unlocks_today + ' שחרורים ב-24 שעות' : '') + '</span></div>' +
+              (l.can_release
+                ? '<button class="btn-icon lk-free" type="button" data-key="' + E(l.subject_key) + '">שחרור</button>'
+                : '<span class="tag">' + (res.can_release ? 'מוצו 3 שחרורים' : 'אין הרשאה') + '</span>') +
+            '</div>';
+          }).join('') +
+          '<div class="hint">שחרור מבטל את הנעילה ומאפשר לבקש קוד חדש ולנסות חמש פעמים נוספות. ' +
+          'עד 3 שחרורים לאותו משתמש ב-24 שעות, וכל שחרור נרשם בלוג.</div>'
+        : '<div class="empty small">אף אחד לא נעול כרגע.</div>') +
+    '</div>';
+
+    var rf = document.getElementById('lk-refresh');
+    if (rf) rf.addEventListener('click', loadLockouts);
+
+    host.querySelectorAll('.lk-free').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        b.disabled = true; b.textContent = 'משחרר…';
+        var r = await call('/admin/lockouts/release', { subject_key: b.getAttribute('data-key') });
+        if (r) notice(r.message_he || 'שוחרר.', 'ok');
+        loadLockouts();
+      });
+    });
+  }
+
+  function hhmm(iso) {
+    if (!iso) return '';
+    try { return YM.hhmm(new Date(iso)); } catch (e) { return ''; }
   }
 
   /* ---------- קריאות API ---------- */
