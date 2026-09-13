@@ -23,6 +23,31 @@
 }
 .badge.company { border-color: rgba(120,160,255,.45); color: #9db7ff; }
 
+/* ---------- טאבים ולידים ---------- */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
+.tab {
+  background: none; border: 0; cursor: pointer; padding: 11px 16px; font-size: 14px; color: var(--text-dim);
+  position: relative; transition: color 120ms ease; display: inline-flex; align-items: center; gap: 6px;
+}
+.tab:hover { color: var(--text); }
+.tab.is-active { color: var(--text); font-weight: 500; }
+.tab.is-active::after { content: ''; position: absolute; inset-inline: 10px; bottom: -1px; height: 2px; background: var(--accent); }
+.tab-count { font-size: 11px; background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 7px; }
+.lead-grid, .lead-row {
+  display: grid; grid-template-columns: 1.4fr 120px 1.4fr 110px 120px 150px; gap: 10px; align-items: center;
+}
+.lead-row { padding: 12px 22px; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; color: var(--text-mid); }
+.lead-row .l-name { color: var(--text); font-weight: 500; font-size: 14.5px; }
+.lead-row .l-sub { font-size: 12px; color: var(--text-faint); }
+.lead-row .l-msg { font-size: 12.5px; color: var(--text-faint); white-space: pre-wrap; overflow-wrap: anywhere; }
+.lead-row .ltr { direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+.lead-row .l-act { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: wrap; }
+.lead-row select.small { height: 30px; font-size: 12px; padding: 0 6px; background: #101216; color: var(--text-body); border: 1px solid var(--border-input); border-radius: 6px; }
+.lead-status { font-size: 11.5px; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border-chip); color: var(--text-mid); white-space: nowrap; }
+.lead-status.new { border-color: rgba(200,16,46,.55); color: var(--accent-soft); }
+.lead-status.contacted { border-color: rgba(226,180,87,.5); color: var(--warn); }
+.lead-status.converted { border-color: rgba(127,192,138,.45); color: var(--ok); }
+
 /* ---------- טפסים ---------- */
 .form { display: flex; flex-direction: column; gap: 15px; }
 .form .field { display: flex; flex-direction: column; gap: 6px; }
@@ -155,10 +180,16 @@
 .deal-status.cancelled { color: var(--text-fainter); }
 
 @media (max-width: 1180px) {
+  .lead-grid, .lead-row { grid-template-columns: 1.4fr 120px 110px 150px; }
+  .lead-grid > :nth-child(3), .lead-grid > :nth-child(4), .lead-row > .l-int, .lead-row > .l-when { display: none; }
   .cust-grid, .cust-row { grid-template-columns: 1.5fr 120px 90px 1.2fr; }
   .cust-grid > :nth-child(3), .cust-grid > :nth-child(6), .cust-row > .c-id, .cust-row > .c-docs { display: none; }
 }
 @media (max-width: 760px) {
+  .lead-grid { display: none; }
+  .lead-row { grid-template-columns: 1fr auto; row-gap: 6px; padding: 12px 16px; }
+  .lead-row > .l-phone { display: none; }
+  .lead-row > .l-act { grid-column: 1 / -1; justify-content: flex-start; }
   .cust-grid { display: none; }
   .cust-row { grid-template-columns: 1fr auto; padding: 12px 16px; row-gap: 4px; }
   .cust-row > .c-phone, .cust-row > .c-last { display: none; }
