@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>האיזור האישי · ידידיה מוטורס</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="portal.css">
+</head>
+<body class="portal">
+
+<!-- ===== כניסה ===== -->
+<main class="auth" id="gate">
+  <div class="logo"><img src="design/assets/logo.png" alt="ידידיה מוטורס"></div>
+
+  <form class="auth-card" id="step-phone" autocomplete="on">
+    <h1>האיזור האישי שלך</h1>
+    <p class="sub">כאן תמצאו את פרטי הרכב שהזמנתם, המסמכים הנדרשים וההסכם לחתימה.<br>נשלח קוד חד-פעמי למספר הטלפון שמסרתם לנו.</p>
+    <div class="field">
+      <label for="phone">מספר טלפון</label>
+      <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="050-000-0000" required>
+    </div>
+    <div class="msg err hidden" id="phone-msg"></div>
+    <button class="btn-primary block" type="submit" id="phone-btn">שלחו לי קוד</button>
+  </form>
+
+  <form class="auth-card hidden" id="step-code" autocomplete="off">
+    <h1>הזנת הקוד</h1>
+    <p class="sub">שלחנו קוד בן 6 ספרות ל-<span id="phone-echo" dir="ltr"></span>.<br>הקוד תקף ל-5 דקות.</p>
+    <div class="field">
+      <label for="code">קוד חד-פעמי</label>
+      <input id="code" name="one-time-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+             autocomplete="one-time-code" placeholder="------" required>
+    </div>
+    <div class="msg err hidden" id="code-msg"></div>
+    <button class="btn-primary block" type="submit" id="code-btn">כניסה</button>
+    <div class="row-between">
+      <button type="button" class="linkish" id="resend-btn" disabled>שליחת קוד חדש</button>
+      <button type="button" class="linkish" id="back-btn">שינוי מספר</button>
+    </div>
+  </form>
+
+  <div class="foot-note">FOR PEOPLE WHO LOVE THE LIFE</div>
+</main>
+
+<!-- ===== האיזור האישי ===== -->
+<div id="app" hidden>
+  <header class="p-head">
+    <div class="p-head-in">
+      <img class="p-logo" src="design/assets/logo.png" alt="ידידיה מוטורס">
+      <div class="p-who"><span id="p-name"></span><button type="button" class="linkish" id="signout">יציאה</button></div>
+    </div>
+  </header>
+
+  <main class="p-main">
+    <div id="notice"></div>
+    <div id="deals"></div>
+    <footer class="p-foot">
+      <span id="p-contact"></span>
+    </footer>
+  </main>
+</div>
+
+<!-- ===== ההסכם ===== -->
+<div class="modal" id="agr-modal" hidden>
+  <div class="modal-box wide">
+    <button class="modal-x" type="button" data-close="agr-modal" aria-label="סגירה">×</button>
+    <h2 id="agr-title">הסכם מכירה</h2>
+    <div class="agr-scroll" id="agr-body"></div>
+
+    <div id="agr-sign">
+      <label class="check consent"><input type="checkbox" id="agr-consent"><span id="agr-consent-text"></span></label>
+
+      <div class="sigbox">
+        <div class="sig-head"><span>חתימה — ציירו כאן באצבע או בעכבר</span><button type="button" class="linkish" id="sig-clear">ניקוי</button></div>
+        <canvas id="sig" width="640" height="200" aria-label="אזור חתימה"></canvas>
+      </div>
+
+      <div class="field otp-field hidden" id="otp-wrap">
+        <label for="sign-code">קוד אימות שנשלח לטלפון שלך</label>
+        <input id="sign-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="------">
+      </div>
+
+      <div class="msg err hidden" id="agr-msg"></div>
+      <div class="agr-actions">
+        <button class="btn-primary" type="button" id="sig-start">שלחו לי קוד לחתימה</button>
+        <button class="btn-primary hidden" type="button" id="sig-submit">חתימה על ההסכם</button>
+        <button class="btn-ghost" type="button" id="agr-print">הדפסה</button>
+      </div>
+      <p class="legal-note">החתימה האלקטרונית נשמרת יחד עם זמן החתימה, אימות הטלפון, כתובת ה-IP וטביעת אצבע דיגיטלית של המסמך — כדי שניתן יהיה להוכיח בדיוק על מה חתמתם.</p>
+    </div>
+
+    <div id="agr-done" class="hidden">
+      <div class="msg ok">ההסכם נחתם ונשמר בתיק שלך. תודה!</div>
+      <a class="btn-primary" id="agr-pdf" href="#" target="_blank" rel="noopener">צפייה בהסכם החתום</a>
+    </div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script src="portal.js"></script>
+</body>
+</html>
