@@ -345,7 +345,8 @@
       var first = i === 0 && p.published;
       return '<figure class="ph' + (p.published ? '' : ' is-hidden') + (first ? ' is-primary' : '') + '"' +
           (s.can ? ' draggable="true"' : '') + ' data-id="' + E(p.id) + '" data-i="' + i + '">' +
-        '<img src="' + E(p.view_url || '') + '" alt="' + E(p.filename || 'תמונת רכב') + '" loading="lazy">' +
+        // בלי loading="lazy": התמונות יושבות בתוך חלון גולל, והדפדפן לא מתחיל לטעון אותן שם
+        '<img src="' + E(p.view_url || '') + '" alt="' + E(p.filename || 'תמונת רכב') + '" decoding="async">' +
         '<figcaption>' + (first ? 'ראשית' : String(i + 1)) + (p.published ? '' : ' · לא באתר') + '</figcaption>' +
         (s.can ? '<div class="ph-acts">' +
           '<button type="button" class="ph-b" data-act="fwd" ' + (i === 0 ? 'disabled' : '') + '>קדימה</button>' +
