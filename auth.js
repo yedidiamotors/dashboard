@@ -128,10 +128,8 @@
   var NAV = [
     { label: 'סקירה כללית',    href: 'index.html' },
     { label: 'מלאי רכבים', href: 'inventory.html', perm: 'view_vehicle_files' },
-    { label: 'מלאי רכבים',      soon: true },
     { label: 'הזמנות בדרך',     soon: true },
-    { label: 'לידים ולקוחות',   soon: true },
-    { label: 'עסקאות ומימון',   soon: true },
+    { label: 'לקוחות ועסקאות', href: 'customers.html', perm: 'create_customer_deal' },
     { label: 'מכולות ומכס',     soon: true },
     { label: 'משתמשים והרשאות', href: 'users.html', perm: 'manage_staff_users' },
     { label: 'לוג משתמשים', href: 'log.html', perm: 'view_access_log' }
