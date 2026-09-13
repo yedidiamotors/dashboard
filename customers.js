@@ -21,6 +21,8 @@
   ];
   var CUST_DOCS = [['id_card', 'תעודת זהות'], ['drivers_license', 'רישיון נהיגה'], ['company_registration', 'תעודת התאגדות'],
                    ['power_of_attorney', 'ייפוי כוח'], ['other', 'אחר']];
+  var LEAD_STATUSES = [['new', 'חדש'], ['contacted', 'נוצר קשר'], ['converted', 'הפך ללקוח'], ['closed', 'נסגר'], ['spam', 'ספאם']];
+  var leads = { rows: [], counts: {}, filter: '', loaded: false };
   var DEAL_STATUSES = [['open', 'פתוחה'], ['pending_signatures', 'ממתינה לחתימות'], ['completed', 'הושלמה'], ['cancelled', 'בוטלה']];
 
   load(true);
@@ -86,7 +88,106 @@
       c.addEventListener('click', function () { state.type = c.getAttribute('data-type'); load(false); });
     });
     renderRows();
+    if (!leads.loaded) loadLeads();
   }
+
+  /* ---------- לידים מהאתר ---------- */
+  async function loadLeads() {
+    var r;
+    try { r = await YM.api('/leads/list', { token: session.token, status: leads.filter || null, limit: 200 }); }
+    catch (err) { document.getElementById('lead-rows').innerHTML = '<div class="empty">' + E(err.message) + '</div>'; return; }
+    if (r.ok !== true) { document.getElementById('lead-rows').innerHTML = '<div class="empty">' + E(r.message_he || 'טעינת הלידים נכשלה.') + '</div>'; return; }
+    leads.rows = r.leads || []; leads.counts = r.counts || {}; leads.loaded = true;
+    var open = (Number(leads.counts.new) || 0) + (Number(leads.counts.contacted) || 0);
+    var badge = document.getElementById('leads-count');
+    badge.textContent = open; badge.hidden = !open;
+    renderLeadFilters();
+    renderLeads();
+  }
+
+  function renderLeadFilters() {
+    var host = document.getElementById('lead-filters');
+    var opts = [['', 'פתוחים'], ['new', 'חדשים'], ['contacted', 'נוצר קשר'], ['converted', 'הפכו ללקוח'], ['closed', 'נסגרו'], ['spam', 'ספאם'], ['all', 'הכל']];
+    host.innerHTML = opts.map(function (o) {
+      var n = o[0] === '' ? (Number(leads.counts.new) || 0) + (Number(leads.counts.contacted) || 0) : o[0] === 'all' ? null : (leads.counts[o[0]] || 0);
+      return '<button class="chip' + (leads.filter === o[0] ? ' is-active' : '') + '" type="button" data-f="' + o[0] + '">' + o[1] + (n !== null ? ' · ' + n : '') + '</button>';
+    }).join('');
+    host.querySelectorAll('.chip').forEach(function (c) {
+      c.addEventListener('click', function () { leads.filter = c.getAttribute('data-f'); loadLeads(); });
+    });
+  }
+
+  function renderLeads() {
+    var host = document.getElementById('lead-rows');
+    if (!leads.rows.length) {
+      host.innerHTML = '<div class="empty">אין לידים בסינון הזה.</div>';
+      document.getElementById('lead-foot').innerHTML = '';
+      return;
+    }
+    host.innerHTML = leads.rows.map(function (l) {
+      var interest = [l.brand, l.interest].filter(Boolean).join(' · ');
+      var done = l.status === 'converted' || l.status === 'spam' || l.status === 'closed';
+      return '<div class="lead-row" data-id="' + E(l.id) + '">' +
+        '<div><div class="l-name">' + E(l.full_name || '—') + '</div>' +
+          (l.message ? '<div class="l-msg">' + E(String(l.message).slice(0, 160)) + '</div>' : '') +
+          (l.customer_name ? '<div class="l-sub">לקוח: ' + E(l.customer_name) + '</div>' : (Number(l.matching_customers) ? '<div class="l-sub">יש כבר לקוח עם הטלפון הזה</div>' : '')) +
+          (l.notes ? '<div class="l-sub">הערה: ' + E(l.notes) + '</div>' : '') + '</div>' +
+        '<div class="ltr l-phone">' + E(YM.phoneHe(l.phone)) + '</div>' +
+        '<div class="l-int">' + E(interest || '—') + (l.source ? '<div class="l-sub">' + E(l.source) + '</div>' : '') + '</div>' +
+        '<div class="l-when">' + E(fmtDT(l.created_at)) + (l.handled_by_name ? '<div class="l-sub">טופל: ' + E(l.handled_by_name) + '</div>' : '') + '</div>' +
+        '<div><span class="lead-status ' + E(l.status) + '">' + E(l.status_he) + '</span></div>' +
+        '<div class="l-act">' +
+          (done ? (l.customer_id ? '<button class="btn-icon lead-open" type="button" data-cid="' + E(l.customer_id) + '">פתח לקוח</button>' : '') :
+            '<button class="btn-icon lead-convert" type="button">הפוך ללקוח</button>') +
+          '<select class="small lead-status-sel" aria-label="סטטוס ליד">' + LEAD_STATUSES.map(function (x) {
+            return '<option value="' + x[0] + '"' + (x[0] === l.status ? ' selected' : '') + '>' + x[1] + '</option>';
+          }).join('') + '</select>' +
+          '<button class="btn-icon lead-note" type="button" title="הערה">✎</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    host.querySelectorAll('.lead-row').forEach(function (row) {
+      var id = row.getAttribute('data-id');
+      var lead = leads.rows.filter(function (x) { return x.id === id; })[0];
+      var conv = row.querySelector('.lead-convert');
+      if (conv) conv.addEventListener('click', function () {
+        openCustomerForm(null);
+        cForm.lead_id.value = id;
+        cForm.full_name.value = lead.full_name || '';
+        cForm.phone.value = YM.phoneHe(lead.phone) || lead.phone || '';
+      });
+      var op = row.querySelector('.lead-open');
+      if (op) op.addEventListener('click', function () { openCard(op.getAttribute('data-cid')); });
+      var sel = row.querySelector('.lead-status-sel');
+      if (sel) sel.addEventListener('change', function () { updateLead({ lead_id: id, status: sel.value }); });
+      var nb = row.querySelector('.lead-note');
+      if (nb) nb.addEventListener('click', function () {
+        var txt = prompt('הערה לליד:', lead.notes || '');
+        if (txt === null) return;
+        updateLead({ lead_id: id, notes: txt });
+      });
+    });
+    document.getElementById('lead-foot').innerHTML = 'מוצגים ' + leads.rows.length + ' לידים';
+  }
+
+  async function updateLead(payload) {
+    payload.token = session.token;
+    var r;
+    try { r = await YM.api('/leads/update', payload); } catch (err) { r = { ok: false, message_he: err.message }; }
+    notice(r.message_he || (r.ok ? 'עודכן.' : 'העדכון נכשל.'), r.ok ? 'ok' : 'err');
+    loadLeads();
+  }
+
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (x) { x.classList.toggle('is-active', x === t); });
+      var which = t.getAttribute('data-tab');
+      document.getElementById('panel-customers').hidden = which !== 'customers';
+      document.getElementById('panel-leads').hidden = which !== 'leads';
+      document.getElementById('new-customer').hidden = which !== 'customers';
+      if (which === 'leads') loadLeads();
+    });
+  });
 
   function renderRows() {
     var host = document.getElementById('rows');
@@ -328,6 +429,11 @@
     if (r.ok) {
       hide('customer-modal');
       notice(payload.id ? 'פרטי הלקוח עודכנו.' : 'הלקוח נוצר.', 'ok');
+      if (cForm.lead_id.value) {
+        await YM.api('/leads/update', { token: session.token, lead_id: cForm.lead_id.value, customer_id: r.customer.id, status: 'converted' });
+        cForm.lead_id.value = '';
+        loadLeads();
+      }
       await load(false);
       openCard(r.customer.id);
       return;
@@ -347,7 +453,15 @@
         '<div class="row-actions"><button class="btn-icon" type="button" data-open="' + E(c.id) + '">פתח את הלקוח הקיים</button></div></div>';
     }).join('') + '<div class="row-actions"><button class="btn-icon danger" type="button" id="dup-force">צור בכל זאת לקוח נפרד</button></div>';
     box.querySelectorAll('[data-open]').forEach(function (b) {
-      b.addEventListener('click', function () { hide('customer-modal'); openCard(b.getAttribute('data-open')); });
+      b.addEventListener('click', async function () {
+        hide('customer-modal');
+        if (cForm.lead_id.value) {
+          await YM.api('/leads/update', { token: session.token, lead_id: cForm.lead_id.value, customer_id: b.getAttribute('data-open'), status: 'converted' });
+          cForm.lead_id.value = '';
+          loadLeads();
+        }
+        openCard(b.getAttribute('data-open'));
+      });
     });
     document.getElementById('dup-force').addEventListener('click', function () { saveCustomer(true); });
   }
