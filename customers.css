@@ -115,6 +115,10 @@
 }
 .doc.open { border-style: dashed; color: var(--warn); border-color: rgba(226,180,87,.5); }
 .doc a { color: inherit; text-decoration: none; }
+.doc .doc-up {
+  background: none; border: 0; padding: 0 0 0 2px; margin-inline-start: 4px; cursor: pointer;
+  color: var(--accent-soft); font-size: 11.5px; text-decoration: underline;
+}
 
 .timeline { display: flex; flex-direction: column; }
 .tl {
