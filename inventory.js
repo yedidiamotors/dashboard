@@ -199,7 +199,9 @@
   }
 
   /* ---------- כרטיס רכב ---------- */
+  var cardRef = null;
   async function openCard(ref) {
+    cardRef = ref;
     document.getElementById('card-body').innerHTML = '<div class="empty">טוען…</div>';
     document.getElementById('modal').hidden = false;
 
@@ -217,6 +219,119 @@
       return;
     }
     document.getElementById('card-body').innerHTML = cardHtml(res);
+    bindCard(res);
+  }
+
+  var VEHICLE_DOCS = [['invoice', 'חשבונית ספק'], ['order_form', 'טופס הזמנה'], ['order_amendment', 'תיקון הזמנה'],
+                      ['booking_doc', 'מסמך בוקינג'], ['customs_doc', 'מסמך מכס'], ['licensing_doc', 'מסמך רישוי'],
+                      ['signed_form', 'טופס חתום'], ['spec_sheet', 'מפרט'], ['sticker_photo', 'צילום מדבקה'], ['other', 'אחר']];
+
+  function specHtml(v) {
+    var s = v.vin_spec;
+    if (!s) {
+      if (!v.vin) return '';
+      return '<div class="sect"><h3>מפרט מה-VIN</h3><p class="note">' +
+        E(v.vin_decode_error ? 'הפענוח נכשל: ' + v.vin_decode_error : 'עדיין לא פוענח — הפענוח רץ אוטומטית כל 20 דקות.') + '</p></div>';
+    }
+    var h = section('מפרט מה-VIN (NHTSA)', [
+      kv('שנת דגם', s.model_year, 'num'),
+      kv('יצרן / דגם', [s.make, s.model].filter(Boolean).join(' ')),
+      kv('גימור', s.trim || null),
+      kv('סדרה', s.series || null),
+      kv('מנוע', s.engine || null),
+      kv('הנעה', s.drive || null),
+      kv('דלק', s.fuel || null),
+      kv('תיבת הילוכים', s.transmission || null),
+      kv('מרכב', s.body || null),
+      kv('דלתות', s.doors, 'num'),
+      kv('מושבים', s.seats, 'num'),
+      kv('משקל כולל', s.gvwr || null),
+      kv('חישוקים', s.wheels_in ? s.wheels_in + ' אינץ׳' : null),
+      kv('ארץ ייצור', s.plant_country ? s.plant_country + (s.plant_city ? ' · ' + s.plant_city : '') : null)
+    ]);
+    if (s.safety && s.safety.length) {
+      h += '<div class="sect"><h3>בטיחות ועזרי נהיגה (סטנדרט לגימור)</h3><div class="chips">' +
+        s.safety.map(function (x) { return '<span class="doc">' + E(x) + '</span>'; }).join('') + '</div></div>';
+    }
+    if (v.vin_decode_error) h += '<p class="note">הערת NHTSA: ' + E(v.vin_decode_error) + '</p>';
+    return h;
+  }
+
+  function docsHtml(v) {
+    var docs = v.documents || [];
+    var h = '<div class="sect"><h3>מסמכי התיק (' + docs.length + ')</h3>';
+    if (!docs.length) h += '<p class="note">אין מסמכים בתיק עדיין. מה שיאיר שולח במייל ומה שמועלה כאן נשמר בתיקיית הרכב ב-Drive.</p>';
+    else h += '<div class="docs">' + docs.map(function (d) {
+      var via = d.uploaded_via === 'email' ? 'מהמייל' : d.uploaded_via === 'staff_dashboard' ? 'מהפאנל' : d.uploaded_via === 'staff_whatsapp' ? 'מוואטסאפ' : d.uploaded_via === 'customer_portal' ? 'מהלקוח' : (d.uploaded_via || '');
+      return '<span class="doc">' +
+        (d.drive_url ? '<a href="' + E(d.drive_url) + '" target="_blank" rel="noopener">' + E(d.doc_type_he) + (d.filename ? ' · ' + E(d.filename) : '') + '</a>' : E(d.doc_type_he)) +
+        '<span class="m">' + E([fmtDT(d.created_at), via, d.uploaded_by_name].filter(Boolean).join(' · ')) + '</span>' +
+        (d.summary ? '<span class="m">' + E(d.summary) + '</span>' : '') + '</span>';
+    }).join('') + '</div>';
+    h += '<div class="doc-tools"><select id="vdoc-type" aria-label="סוג מסמך">' + VEHICLE_DOCS.map(function (x) {
+      return '<option value="' + x[0] + '">' + x[1] + '</option>';
+    }).join('') + '</select><button class="btn-icon" type="button" id="vdoc-up">צירוף קובץ לתיק הרכב</button></div></div>';
+    return h;
+  }
+
+  function sourcesHtml(v) {
+    var src = v.sources || [];
+    if (!src.length) return '';
+    return '<div class="sect"><h3>מאיפה הגיעו הנתונים</h3>' + src.map(function (s) {
+      var what = s.channel === 'gmail' ? 'מייל' : s.channel === 'whatsapp' ? 'וואטסאפ' : s.source === 'sheet_import' ? 'גיליון המלאי' : (s.source || '');
+      var who = s.from ? String(s.from).replace(/<.*?>/, '').replace(/"/g, '').trim() : '';
+      return '<div class="src">' + E([what, who, s.document_type === 'invoice' ? 'חשבונית' : s.document_type, s.subject].filter(Boolean).join(' · ')) +
+        '<span class="m">' + E([fmtDT(s.received_at), (s.attachments || []).join(', ')].filter(Boolean).join(' · ')) + '</span>' +
+        (s.summary_he ? '<span class="m">' + E(s.summary_he) + '</span>' : '') +
+        (s.notes ? '<span class="m">' + E(s.notes) + '</span>' : '') + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function fmtDT(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear() + ' ' + YM.hhmm(d);
+  }
+
+  function bindCard(res) {
+    var v = res.vehicle || {};
+    var up = document.getElementById('vdoc-up');
+    if (up) up.addEventListener('click', function () {
+      pickFile({ scope: 'vehicle', target_id: v.id, doc_type: document.getElementById('vdoc-type').value });
+    });
+  }
+
+  /* ---------- העלאת קובץ לתיק הרכב (Drive דרך n8n) ---------- */
+  var fileInput = document.getElementById('file-input');
+  var pendingUpload = null;
+  function pickFile(ctx) { pendingUpload = ctx; fileInput.value = ''; fileInput.click(); }
+  fileInput.addEventListener('change', async function () {
+    var f = fileInput.files && fileInput.files[0];
+    if (!f || !pendingUpload) return;
+    if (f.size > 15 * 1024 * 1024) { cardNotice('הקובץ גדול מדי (עד 15MB).'); return; }
+    var btn = document.getElementById('vdoc-up');
+    if (btn) { btn.disabled = true; btn.textContent = 'מעלה…'; }
+    var fd = new FormData();
+    fd.append('token', session.token);
+    fd.append('scope', pendingUpload.scope);
+    fd.append('target_id', pendingUpload.target_id);
+    fd.append('doc_type', pendingUpload.doc_type);
+    fd.append('file', f, f.name);
+    var r;
+    try {
+      var resp = await fetch(YM.API_BASE + '/documents/upload', { method: 'POST', body: fd });
+      r = await resp.json().catch(function () { return { ok: false, message_he: 'תשובה לא תקינה מהשרת.' }; });
+    } catch (err) { r = { ok: false, message_he: 'אין תקשורת עם השרת.' }; }
+    pendingUpload = null;
+    if (r.ok) { openCard(cardRef); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'צירוף קובץ לתיק הרכב'; } cardNotice(r.message_he || 'ההעלאה נכשלה.'); }
+  });
+  function cardNotice(text) {
+    var body = document.getElementById('card-body');
+    var el = document.createElement('div');
+    el.className = 'banner'; el.textContent = text;
+    body.insertBefore(el, body.firstChild);
+    setTimeout(function () { el.remove(); }, 5000);
   }
 
   function cardHtml(res) {
@@ -238,8 +353,10 @@
       kv('ריפוד', v.upholstery)
     ]);
 
+    h += specHtml(v);
+
     var feat = v.features || {};
-    h += section('מפרט ורישוי', [
+    h += section('רישוי ואבזור (מהגיליון)', [
       kv('תקן', feat.standard || v.standard_type),
       kv('מפתח ספייר', boolHe(v.has_spare_key)),
       kv('איתורן', boolHe(v.tracking_device_installed)),
@@ -277,6 +394,9 @@
       kv('חושב בתאריך', v.tax_calc_date ? String(v.tax_calc_date).slice(0, 10) : null),
       kv('עודכן ידנית', v.manually_overridden === true ? 'כן' : null)
     ]);
+
+    h += docsHtml(v);
+    h += sourcesHtml(v);
 
     if (res.message_he) {
       h += '<div class="wa-preview"><h3>כך הרכב הזה נשלח בוואטסאפ</h3>' +
