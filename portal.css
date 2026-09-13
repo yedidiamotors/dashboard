@@ -1,0 +1,118 @@
+/* ============================================================
+   ידידיה מוטורס — האיזור האישי ללקוח
+   ============================================================ */
+
+body.portal { display: block; }
+body.portal .auth {
+  width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 26px;
+  margin: 0 auto; padding: 40px 20px; min-height: 100vh; justify-content: center;
+}
+body.portal .auth .logo { max-width: 230px; margin-inline: auto; padding: 0; }
+.auth-card {
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-card);
+  padding: 26px 24px 24px; display: flex; flex-direction: column; gap: 18px;
+}
+.auth-card h1 { margin: 0; font-family: Cinzel, serif; font-size: 22px; font-weight: 400; color: var(--text); }
+.auth-card .sub { font-size: 13.5px; color: var(--text-faint); line-height: 1.6; margin-top: -8px; }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field label { font-size: 12.5px; color: var(--text-faint); }
+.field input {
+  height: 46px; padding: 0 14px; border-radius: 6px; background: #101216;
+  border: 1px solid var(--border-input); color: var(--text-body); font-size: 15px;
+  outline: none; transition: border-color 120ms ease; direction: ltr; text-align: right;
+}
+.field input:focus { border-color: var(--accent); }
+.field input[inputmode="numeric"] {
+  text-align: center; letter-spacing: .55em; font-size: 22px; font-family: Cinzel, serif; padding-inline-start: .55em;
+}
+.btn-primary.block { width: 100%; justify-content: center; height: 46px; font-size: 14.5px; }
+.msg { font-size: 13px; line-height: 1.6; border-radius: 6px; padding: 10px 12px; }
+.msg.err { background: var(--accent-tint); color: var(--accent-soft); border: 1px solid rgba(200,16,46,.35); }
+.msg.ok  { background: var(--chip-bg); color: var(--text-mid); border: 1px solid var(--border-chip); }
+.linkish { background: none; border: 0; padding: 0; cursor: pointer; font-size: 13px; color: var(--accent-soft); font-family: inherit; }
+.linkish:disabled { color: var(--text-fainter); cursor: default; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.foot-note { font-size: 11.5px; letter-spacing: .1em; color: var(--text-fainter-3); text-align: center; line-height: 1.8; }
+.hidden { display: none !important; }
+
+/* ---- מסגרת ---- */
+.p-head { border-bottom: 1px solid var(--border); background: var(--surface-card); }
+.p-head-in { max-width: 880px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.p-logo { height: 34px; }
+.p-who { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--text-mid); }
+.p-main { max-width: 880px; margin: 0 auto; padding: 22px 20px 60px; display: flex; flex-direction: column; gap: 18px; }
+.p-foot { font-size: 12px; color: var(--text-fainter); text-align: center; padding-top: 10px; }
+
+/* ---- כרטיס עסקה ---- */
+.d-card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface-card); overflow: hidden; }
+.d-top { padding: 18px 20px; display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; align-items: flex-start; border-bottom: 1px solid var(--border-soft); }
+.d-title { font-size: 19px; color: var(--text); font-weight: 500; unicode-bidi: plaintext; }
+.d-sub { font-size: 13px; color: var(--text-faint); margin-top: 3px; unicode-bidi: plaintext; }
+.d-sec { padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
+.d-sec:last-child { border-bottom: 0; }
+.d-sec h3 { margin: 0 0 10px; font-size: 11.5px; letter-spacing: .08em; color: var(--text-fainter); font-weight: 400; }
+.kv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 16px; }
+.kv > div { display: flex; flex-direction: column; gap: 2px; }
+.kv .k { font-size: 11.5px; color: var(--text-fainter); }
+.kv .v { font-size: 14px; color: var(--text-body); unicode-bidi: plaintext; }
+.kv .v.big { font-size: 17px; color: var(--text); }
+
+.req { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; color: var(--text-body); }
+.req:last-child { border-bottom: 0; }
+.req .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-chip); flex: none; }
+.req.done .dot { background: var(--ok); }
+.req.done { color: var(--text-faint); }
+.req .st { margin-inline-start: auto; font-size: 11.5px; color: var(--text-fainter); }
+
+.doc-row { display: flex; gap: 10px; align-items: center; padding: 7px 0; font-size: 13px; color: var(--text-mid); border-bottom: 1px solid var(--border-soft); }
+.doc-row:last-child { border-bottom: 0; }
+.doc-row .n { unicode-bidi: plaintext; direction: ltr; font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--text-faint); }
+
+.agr-box { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.agr-box .t { font-size: 14px; color: var(--text-body); }
+.agr-box .s { font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
+.pill { font-size: 11.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border-chip); color: var(--text-mid); }
+.pill.wait { border-color: rgba(226,180,87,.5); color: var(--warn); }
+.pill.done { border-color: rgba(127,192,138,.45); color: var(--ok); }
+
+/* ---- מודל ההסכם ---- */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow: auto; z-index: 60; }
+.modal-box { position: relative; width: 100%; max-width: 560px; background: var(--surface-card); border: 1px solid var(--border); border-radius: 10px; padding: 22px 22px 20px; display: flex; flex-direction: column; gap: 14px; }
+.modal-box.wide { max-width: 820px; }
+.modal-box h2 { margin: 0; font-family: Cinzel, serif; font-weight: 400; font-size: 20px; color: var(--text); }
+.modal-x { position: absolute; inset-inline-end: 16px; top: 12px; background: none; border: 0; color: var(--text-dim); font-size: 26px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.modal-x:hover { color: var(--text); }
+
+.agr-scroll {
+  max-height: 46vh; overflow: auto; background: #fff; border-radius: 8px; padding: 20px 18px;
+  border: 1px solid var(--border-chip);
+}
+.check.consent { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--text-body); cursor: pointer; line-height: 1.6; }
+.check.consent input { width: 18px; height: 18px; accent-color: var(--accent); margin-top: 2px; flex: none; }
+
+.sigbox { border: 1px solid var(--border-input); border-radius: 8px; overflow: hidden; background: #fff; }
+.sig-head { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; font-size: 12px; color: #555; background: #f3f3f3; border-bottom: 1px solid #ddd; }
+.sig-head .linkish { color: #a3121f; }
+#sig { display: block; width: 100%; height: 180px; touch-action: none; cursor: crosshair; background: #fff; }
+.otp-field input { max-width: 220px; }
+.agr-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.legal-note { font-size: 11.5px; color: var(--text-fainter); line-height: 1.65; margin: 0; }
+
+@media (max-width: 700px) {
+  .kv { grid-template-columns: repeat(2, 1fr); }
+  .agr-scroll { max-height: 40vh; padding: 14px 12px; }
+  .modal { padding: 12px 8px; }
+  .modal-box { padding: 18px 14px 16px; }
+}
+@media (max-width: 420px) {
+  .kv { grid-template-columns: 1fr 1fr; }
+  .agr-actions .btn-primary, .agr-actions .btn-ghost { flex: 1; justify-content: center; }
+}
+
+@media print {
+  body.portal > *:not(#agr-modal) { display: none !important; }
+  .modal { position: static; background: none; padding: 0; overflow: visible; }
+  .modal-box { border: 0; background: #fff; max-width: none; padding: 0; }
+  .modal-x, #agr-sign, #agr-done, #agr-title { display: none !important; }
+  .agr-scroll { max-height: none; overflow: visible; border: 0; padding: 0; }
+}
