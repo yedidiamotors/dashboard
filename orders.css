@@ -42,6 +42,15 @@
 .veh .meta .tag { font-size: 11px; }
 .veh .tag.warn { border-color: rgba(226,180,87,.5); color: var(--warn); }
 .veh .tag.ok { border-color: rgba(127,192,138,.45); color: var(--ok); }
+.veh .docs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.veh .docs .docs-l { font-size: 11px; color: var(--text-fainter); letter-spacing: .04em; }
+.veh .docs .docs-l.empty-docs { font-style: italic; }
+.veh .docs .doc {
+  font-size: 11.5px; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border-chip); color: var(--text-mid);
+  text-decoration: none; unicode-bidi: plaintext; transition: border-color 120ms ease, color 120ms ease;
+}
+.veh .docs .doc .ltr { direction: ltr; unicode-bidi: isolate; font-family: ui-monospace, monospace; font-size: 11px; }
+.veh .docs a.doc:hover { border-color: var(--accent); color: var(--text); }
 .veh .actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; min-width: 130px; }
 .veh .actions .row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .btn-icon {
