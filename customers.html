@@ -114,9 +114,21 @@
       <div class="field" data-for="company" hidden><label for="c-contact">איש קשר</label><input id="c-contact" name="contact_person" autocomplete="off"></div>
       <div class="field"><label for="c-phone">טלפון</label><input id="c-phone" name="phone" inputmode="tel" dir="ltr" placeholder="050-000-0000"></div>
       <div class="field" data-for="individual"><label for="c-id">תעודת זהות</label><input id="c-id" name="id_number" inputmode="numeric" dir="ltr"></div>
-      <div class="field" data-for="company" hidden><label for="c-reg">ח.פ</label><input id="c-reg" name="company_reg_number" inputmode="numeric" dir="ltr"></div>
+      <div class="field" data-for="company" hidden><label for="c-reg">מס׳ ח.פ / ע.מ</label>
+        <div class="reg-row">
+          <div class="seg small" id="reg-seg">
+            <button type="button" class="is-active" data-reg="hp">ח.פ</button>
+            <button type="button" data-reg="am">ע.מ</button>
+          </div>
+          <input id="c-reg" name="company_reg_number" inputmode="numeric" dir="ltr">
+          <input type="hidden" name="company_reg_type" value="hp">
+        </div>
+      </div>
+      <div class="sub-head">פרטים לחשבונית</div>
+      <div class="field"><label for="c-addr">כתובת</label><input id="c-addr" name="address" autocomplete="off" placeholder="רחוב, מספר, עיר"></div>
+      <div class="field"><label for="c-email">מייל לחשבונית</label><input id="c-email" name="invoice_email" type="email" dir="ltr" autocomplete="off" placeholder="name@company.co.il"></div>
       <div id="dup-box" hidden></div>
-      <div class="hint">הטלפון והזיהוי משמשים גם לכניסת הלקוח לעמוד האישי שלו — לוודא שהם נכונים.</div>
+      <div class="hint">הטלפון והזיהוי משמשים גם לכניסת הלקוח לעמוד האישי שלו — לוודא שהם נכונים. הכתובת והמייל נדרשים לחשבונית.</div>
       <div class="modal-actions">
         <button class="btn-primary" type="submit" id="customer-save">שמירה</button>
         <button class="btn-ghost" type="button" data-close="customer-modal">ביטול</button>
@@ -157,6 +169,12 @@
       <div class="grid2">
         <div class="field"><label for="d-price">מחיר מכירה ללקוח (₪)</label><input id="d-price" name="sale_price" inputmode="numeric" dir="ltr"></div>
       </div>
+
+      <div class="field">
+        <label class="check"><input type="checkbox" name="financing_required"> העסקה במימון</label>
+        <label class="check" id="fin-private-wrap" hidden><input type="checkbox" name="financing_on_private_name"> המימון על שם אדם פרטי (נדרשים ת.ז שני צדדים, רישיון, ספח ופרטי אשראי לבדיקת דוח)</label>
+      </div>
+      <div class="hint" id="reg-hint"></div>
 
       <div class="modal-actions">
         <button class="btn-primary" type="submit" id="deal-save">פתיחת עסקה</button>
