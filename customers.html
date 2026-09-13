@@ -51,17 +51,37 @@
 
     <div id="notice"></div>
 
-    <div class="filter-bar">
-      <div class="filter-group" id="type-filters" aria-label="סינון לפי סוג לקוח"></div>
+    <div class="tabs" role="tablist">
+      <button class="tab is-active" type="button" data-tab="customers" role="tab">לקוחות</button>
+      <button class="tab" type="button" data-tab="leads" role="tab">לידים מהאתר <span class="tab-count" id="leads-count" hidden></span></button>
     </div>
 
-    <div class="card">
-      <div class="thead cust-grid">
-        <div>לקוח</div><div>טלפון</div><div>זיהוי</div><div>עסקאות</div><div>עסקה אחרונה</div><div>מסמכים</div>
+    <section id="panel-customers">
+      <div class="filter-bar">
+        <div class="filter-group" id="type-filters" aria-label="סינון לפי סוג לקוח"></div>
       </div>
-      <div id="rows"></div>
-      <div class="card-foot" id="foot"></div>
-    </div>
+
+      <div class="card">
+        <div class="thead cust-grid">
+          <div>לקוח</div><div>טלפון</div><div>זיהוי</div><div>עסקאות</div><div>עסקה אחרונה</div><div>מסמכים</div>
+        </div>
+        <div id="rows"></div>
+        <div class="card-foot" id="foot"></div>
+      </div>
+    </section>
+
+    <section id="panel-leads" hidden>
+      <div class="filter-bar">
+        <div class="filter-group" id="lead-filters" aria-label="סינון לידים"></div>
+      </div>
+      <div class="card">
+        <div class="thead lead-grid">
+          <div>ליד</div><div>טלפון</div><div>עניין</div><div>הגיע</div><div>סטטוס</div><div></div>
+        </div>
+        <div id="lead-rows"><div class="empty">טוען…</div></div>
+        <div class="card-foot" id="lead-foot"></div>
+      </div>
+    </section>
 
   </main>
 </div>
@@ -81,6 +101,7 @@
     <h2 id="customer-modal-title">לקוח חדש</h2>
     <form id="customer-form" class="form" novalidate>
       <input type="hidden" name="id">
+      <input type="hidden" name="lead_id">
       <div class="field">
         <label>סוג לקוח</label>
         <div class="seg" id="type-seg">
