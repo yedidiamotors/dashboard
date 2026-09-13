@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>הזמנות בדרך · ידידיה מוטורס</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="orders.css">
+</head>
+<body>
+
+<div class="boot" id="boot">
+  <div class="mark">YEDIDIA MOTORS</div>
+  <div class="spinner"></div>
+  <div class="msg">טוען הזמנות…</div>
+</div>
+
+<div class="shell" id="shell" hidden>
+
+  <aside class="aside">
+    <div class="logo"><img src="design/assets/logo.png" alt="ידידיה מוטורס"></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="aside-foot">
+      <div id="side-box"></div>
+      <div class="tagline">FOR PEOPLE WHO LOVE THE LIFE</div>
+      <button class="signout" type="button" id="signout">יציאה מהחשבון</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <header class="topbar">
+      <div class="who">
+        <div class="eyebrow" id="eyebrow">יבוא</div>
+        <h1 class="greeting">הזמנות בדרך ומכולות</h1>
+        <div class="meta-line" id="meta-line"></div>
+      </div>
+      <div class="tools">
+        <button class="btn-ghost" type="button" id="refresh">רענון</button>
+        <div class="avatar" id="avatar">—</div>
+      </div>
+    </header>
+
+    <div id="notice"></div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab is-active" type="button" data-tab="board" role="tab">רכבים בתהליך <span class="tab-count" id="count-board" hidden></span></button>
+      <button class="tab" type="button" data-tab="containers" role="tab">מכולות <span class="tab-count" id="count-containers" hidden></span></button>
+      <button class="tab" type="button" data-tab="quotas" role="tab">מכסות רישיון יבוא <span class="tab-count" id="count-quotas" hidden></span></button>
+    </div>
+
+    <section id="panel-board">
+      <div class="stages" id="stages"></div>
+      <div id="board"></div>
+      <div class="card" id="recent-card" hidden>
+        <div class="card-head"><h2>הגיעו למלאי לאחרונה</h2><span class="card-count" id="recent-count"></span></div>
+        <div id="recent"></div>
+      </div>
+    </section>
+
+    <section id="panel-containers" hidden>
+      <div id="containers"></div>
+    </section>
+
+    <section id="panel-quotas" hidden>
+      <div class="filter-bar"><button class="btn-primary small" type="button" id="new-quota" hidden>מכסה חדשה</button></div>
+      <div class="card">
+        <div class="thead quota-grid"><div>יבואן / שותף</div><div>תקן</div><div>יצרן · דגם</div><div>מס׳ בקשה</div><div>נוצלו / מאושר</div><div>בתוקף עד</div><div>סטטוס</div></div>
+        <div id="quotas"></div>
+      </div>
+      <p class="hint">שיבוץ למכולה בוחר אוטומטית מכסה מאושרת בתוקף עם יתרה שמתאימה לתקן/יצרן/דגם. בלי מכסה מתאימה — אין שיבוץ.</p>
+    </section>
+
+  </main>
+</div>
+
+<!-- אישור הזמנה -->
+<div class="modal" id="approve-modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <button class="modal-x" type="button" data-close="approve-modal" aria-label="סגירה">×</button>
+    <h2>אישור הזמנה</h2>
+    <form id="approve-form" class="form" novalidate>
+      <input type="hidden" name="vehicle_id">
+      <div class="sub" id="approve-line"></div>
+      <div class="field"><label for="a-order">מספר ההזמנה כפי שמופיע בטופס ההזמנה המקורי</label><input id="a-order" name="confirmed_order_number" dir="ltr" autocomplete="off"></div>
+      <div class="hint">האישור מאומת מול מספר ההזמנה שנקלט מהמסמכים. אם בתיק אין מספר הזמנה — לערוך את התיק קודם.</div>
+      <div class="modal-actions">
+        <button class="btn-primary" type="submit">אישור</button>
+        <button class="btn-ghost" type="button" data-close="approve-modal">ביטול</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- שיבוץ למכולה -->
+<div class="modal" id="book-modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <button class="modal-x" type="button" data-close="book-modal" aria-label="סגירה">×</button>
+    <h2>שיבוץ למכולה</h2>
+    <form id="book-form" class="form" novalidate>
+      <input type="hidden" name="vehicle_id">
+      <div class="sub" id="book-line"></div>
+      <div class="field"><label for="b-existing">מכולה פתוחה</label><select id="b-existing" name="existing"></select></div>
+      <div class="field" id="b-new-wrap"><label for="b-number">מספר מכולה חדשה</label><input id="b-number" name="container_number" dir="ltr" placeholder="MSCU1234567" autocomplete="off"></div>
+      <div class="field"><label for="b-quota">מכסת רישיון יבוא</label><select id="b-quota" name="quota_id"><option value="">בחירה אוטומטית (מכסה מתאימה עם יתרה)</option></select></div>
+      <div class="hint">40HC · 2 רכבים למכולה. השיבוץ מפעיל הפקת מפרט אוטומטית.</div>
+      <div class="modal-actions">
+        <button class="btn-primary" type="submit">שיבוץ</button>
+        <button class="btn-ghost" type="button" data-close="book-modal">ביטול</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- עריכת תיק -->
+<div class="modal" id="vehicle-modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <button class="modal-x" type="button" data-close="vehicle-modal" aria-label="סגירה">×</button>
+    <h2>עריכת תיק רכב</h2>
+    <form id="vehicle-form" class="form" novalidate>
+      <input type="hidden" name="vehicle_id">
+      <div class="sub" id="vehicle-line"></div>
+      <div class="grid2">
+        <div class="field"><label for="v-order">מספר הזמנה</label><input id="v-order" name="order_number" dir="ltr"></div>
+        <div class="field"><label for="v-lot">מספר לוט</label><input id="v-lot" name="stock_lot_number" dir="ltr"></div>
+        <div class="field"><label for="v-std">תקן</label><select id="v-std" name="standard_type"><option value="">—</option><option value="canadian">קנדי</option><option value="federal">פדרלי (ארה״ב)</option><option value="other">אחר</option></select></div>
+        <div class="field"><label for="v-year">שנת דגם</label><input id="v-year" name="model_year" inputmode="numeric" dir="ltr"></div>
+        <div class="field"><label for="v-color">צבע</label><input id="v-color" name="color"></div>
+        <div class="field"><label for="v-trim">גימור</label><input id="v-trim" name="trim"></div>
+        <div class="field"><label for="v-loc">מיקום</label><input id="v-loc" name="location"></div>
+        <div class="field"><label for="v-key">מפתח ספייר</label><select id="v-key" name="has_spare_key"><option value="">לא ידוע</option><option value="true">יש</option><option value="false">אין</option></select></div>
+      </div>
+      <div class="field"><label for="v-notes">הערות</label><input id="v-notes" name="misc_notes"></div>
+      <div class="modal-actions">
+        <button class="btn-primary" type="submit">שמירה</button>
+        <button class="btn-ghost" type="button" data-close="vehicle-modal">ביטול</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- מכולה -->
+<div class="modal" id="container-modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <button class="modal-x" type="button" data-close="container-modal" aria-label="סגירה">×</button>
+    <h2 id="container-title">מכולה</h2>
+    <form id="container-form" class="form" novalidate>
+      <input type="hidden" name="container_id">
+      <div class="grid2">
+        <div class="field"><label for="c-number">מספר מכולה</label><input id="c-number" name="container_number" dir="ltr"></div>
+        <div class="field"><label for="c-vessel">אונייה</label><input id="c-vessel" name="vessel_name" dir="ltr"></div>
+        <div class="field"><label for="c-line">חברת ספנות</label><input id="c-line" name="shipping_line"></div>
+        <div class="field"><label for="c-voyage">מספר הפלגה</label><input id="c-voyage" name="voyage_number" dir="ltr"></div>
+        <div class="field"><label for="c-eta">ETA (הגעה משוערת)</label><input id="c-eta" name="eta" type="date"></div>
+        <div class="field"><label class="check" style="margin-top:26px"><input type="checkbox" name="telex_release"> טלקס רליס התקבל</label></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" type="submit">שמירה</button>
+        <button class="btn-ghost" type="button" data-close="container-modal">ביטול</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- מכסה -->
+<div class="modal" id="quota-modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <button class="modal-x" type="button" data-close="quota-modal" aria-label="סגירה">×</button>
+    <h2 id="quota-title">מכסת רישיון יבוא</h2>
+    <form id="quota-form" class="form" novalidate>
+      <input type="hidden" name="id">
+      <div class="field"><label for="q-name">יבואן / שותף שביקש</label><input id="q-name" name="importer_partner_name" placeholder="למשל JFP קנדה"></div>
+      <div class="grid2">
+        <div class="field"><label for="q-std">תקן</label><select id="q-std" name="standard_type"><option value="canadian">קנדי</option><option value="federal">פדרלי (ארה״ב)</option><option value="other">אחר</option></select></div>
+        <div class="field"><label for="q-status">סטטוס</label><select id="q-status" name="status"><option value="approved">מאושרת</option><option value="to_submit">להגשה</option><option value="rejected">נדחתה</option></select></div>
+        <div class="field"><label for="q-make">יצרן (אופציונלי)</label><input id="q-make" name="make" dir="ltr"></div>
+        <div class="field"><label for="q-model">דגם (אופציונלי)</label><input id="q-model" name="model" dir="ltr"></div>
+        <div class="field"><label for="q-qty">כמות מאושרת</label><input id="q-qty" name="approved_quantity" inputmode="numeric" dir="ltr"></div>
+        <div class="field"><label for="q-valid">בתוקף עד</label><input id="q-valid" name="valid_until" type="date"></div>
+        <div class="field"><label for="q-req">מספר בקשה</label><input id="q-req" name="request_number" dir="ltr"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" type="submit">שמירה</button>
+        <button class="btn-ghost" type="button" data-close="quota-modal">ביטול</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script src="orders.js"></script>
+</body>
+</html>
