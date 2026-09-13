@@ -10,6 +10,7 @@
   var state = { data: null, brandFilter: 'all', search: '' };
   var REFRESH_MS = 5 * 60 * 1000;
 
+  /* ---------- אתחול ---------- */
   var session = YM.getSession();
   if (!session) { location.replace('login.html'); return; }
 
@@ -53,6 +54,7 @@
     }
 
     state.data = res;
+    // רענון פרטי המשתמש בסשן המקומי — הרשאות יכולות להשתנות בין כניסות
     try {
       var s = YM.getSession() || {};
       s.user = res.user; s.permissions = res.permissions;
@@ -81,6 +83,7 @@
     var canFiles = perms.indexOf('view_vehicle_files') > -1;
     var now = new Date();
 
+    /* כותרת עליונה */
     document.getElementById('greeting').textContent =
       YM.greetingFor(now) + ', ' + (user.name || '');
     document.getElementById('eyebrow').textContent = isSales ? 'יום המכירות שלי' : 'סקירת מלאי';
@@ -92,6 +95,7 @@
 
     YM.renderNav('nav', 'index.html', perms);
 
+    /* קופסת הסרגל */
     var box = document.getElementById('side-box');
     if (isManager && canPrice) {
       box.innerHTML =
@@ -126,6 +130,7 @@
         '</div>';
     }
 
+    /* מדדים */
     var kpis = isSales ? [
       { label: 'מסירות שלי החודש', value: d.kpis.my_deliveries_this_month, unit: 'מתוך יעד 10',
         delta: Math.round(d.kpis.my_deliveries_this_month / 10 * 100) + '%', note: 'מהיעד החודשי' },
@@ -134,7 +139,7 @@
       { label: 'לידים פתוחים', value: d.kpis.open_leads, unit: 'פניות',
         delta: '', note: 'מהאתר, ממתינים למענה' },
       { label: 'זמין להצעה', value: d.kpis.available, unit: 'רכבים',
-        delta: '', note: 'במלאי בארץ' }
+        delta: '', note: d.kpis.in_transit + ' נוספים בדרך' }
     ] : [
       { label: 'רכבים זמינים למסירה', value: d.kpis.available, unit: 'מתוך ' + d.kpis.total,
         delta: '', note: 'במלאי בארץ' },
@@ -158,6 +163,7 @@
       '</div>';
     }).join('');
 
+    /* צ׳יפים של יצרנים */
     var brands = d.brands || [];
     var chips = ['<button class="chip' + (state.brandFilter === 'all' ? ' is-active' : '') +
                  '" data-brand="all" type="button">הכל</button>'];
@@ -174,11 +180,12 @@
       });
     });
 
+    /* טבלת המלאי */
     var list = (d.inventory || []).filter(function (v) {
       if (state.brandFilter !== 'all' &&
           String(v.make || '').toUpperCase() !== state.brandFilter) return false;
       if (state.search) {
-        var hay = [v.model, v.trim, v.vin_tail, v.order_number, v.lot, v.status_he, v.location]
+        var hay = [v.model, v.trim, v.vin_tail, v.order_number, v.lot, v.status_he]
           .join(' ').toLowerCase();
         if (hay.indexOf(state.search) === -1) return false;
       }
@@ -192,7 +199,7 @@
     } else if (!list.length) {
       rowsEl.innerHTML = '<div class="empty">' +
         (d.kpis.total === 0
-          ? 'אין כרגע רכבים במלאי.'
+          ? 'אין עדיין רכבים במערכת.<br>תיקי רכב נפתחים אוטומטית מהמיילים ומהמדבקות בוואטסאפ.'
           : 'לא נמצאו רכבים התואמים לסינון.') +
         '</div>';
     } else {
@@ -221,10 +228,11 @@
 
     document.getElementById('inventory-foot').textContent =
       canFiles && d.kpis.total
-        ? 'מוצגים ' + list.length + ' מתוך ' + d.kpis.total + ' רכבים במלאי'
+        ? 'מוצגים ' + list.length + ' מתוך ' + d.kpis.total + ' תיקי רכב פעילים'
         : '';
 
-    var side = [];
+    /* כרטיסי צד */
+    var side = ['<div id="perf-card"></div>'];
 
     if (isSales && (d.leads || []).length) {
       side.push(card('הלידים שלי לטיפול', d.leads.length + ' פניות',
@@ -248,7 +256,7 @@
                   Math.round(b.units / maxUnits * 100) + '%"></div></div>' +
               '</div>';
             }).join('') + '</div>'
-          : '<div class="empty small">אין כרגע רכבים במלאי.</div>'));
+          : '<div class="empty small">אין עדיין רכבים במלאי.</div>'));
 
       if (isManager) {
         side.push(card('דורש תשומת לב', '',
@@ -259,20 +267,109 @@
                   '<span class="s">' + E(a.detail) + '</span></div></div>';
               }).join('') + '</div>'
             : '<div class="empty small">אין כרגע פריטים שדורשים טיפול.</div>'));
-
-        side.push(card('מכולות בדרך', (d.incoming || []).length + ' מכולות',
-          (d.incoming || []).length
-            ? '<div class="list">' + d.incoming.map(function (c) {
-                var note = [c.models || (c.vehicles + ' רכבים'), c.vessel]
-                  .filter(Boolean).join(' · ');
-                var eta = c.eta ? etaText(c.eta) : c.status_he;
-                return listRow(c.container_number, note, eta);
-              }).join('') + '</div>'
-            : '<div class="empty small">אין מכולות פעילות במעקב.</div>'));
       }
+
+      side.push(card('מכולות בדרך', (d.incoming || []).length + ' מכולות',
+        (d.incoming || []).length
+          ? '<div class="list">' + d.incoming.map(function (c) {
+              var note = [c.models || (c.vehicles + ' רכבים'), c.vessel]
+                .filter(Boolean).join(' · ');
+              var eta = c.eta ? etaText(c.eta) : c.status_he;
+              return listRow(c.container_number, note, eta);
+            }).join('') + '</div>'
+          : '<div class="empty small">אין מכולות פעילות במעקב.</div>'));
     }
 
     document.getElementById('side-col').innerHTML = side.join('');
+    loadPerformance();
+  }
+
+  /* ---------- הביצועים שלי ----------
+     כל עסקה נרשמת על מי שפתח אותה (sales_owner_staff_id), ולכן אפשר למדוד
+     לאורך זמן: כמה נפתחו כל חודש, כמה נחתמו וכמה נמכרו בפועל. */
+  var perf = null;
+  async function loadPerformance(staffId) {
+    var host = document.getElementById('perf-card');
+    if (!host) return;
+    host.innerHTML = card('הביצועים שלי', '', '<div class="empty small">טוען…</div>');
+    var r;
+    try { r = await YM.api('/sales/scoreboard', { token: session.token, staff_id: staffId || null }); }
+    catch (err) { r = { ok: false, message_he: 'אין תקשורת עם השרת.' }; }
+    if (r.ok !== true) {
+      host.innerHTML = card('הביצועים שלי', '',
+        '<div class="empty small">' + E(r.message_he || 'לא ניתן לטעון את הנתונים.') + '</div>');
+      return;
+    }
+    perf = r;
+    renderPerformance();
+  }
+
+  function renderPerformance() {
+    var host = document.getElementById('perf-card');
+    if (!host || !perf) return;
+    var months = perf.months || [];
+    var cur  = months[months.length - 1] || { opened: 0, sold: 0, revenue: 0 };
+    var prev = months[months.length - 2] || { opened: 0, sold: 0, revenue: 0 };
+    var me   = perf.staff && perf.staff.is_me;
+    var title = me ? 'הביצועים שלי' : 'הביצועים של ' + (perf.staff.name || '');
+
+    var max = months.reduce(function (m, x) { return Math.max(m, x.opened, x.sold); }, 0) || 1;
+    var bars = '<div class="perf-bars">' + months.map(function (x) {
+      return '<div class="perf-col' + (x.is_current ? ' now' : '') + '" title="' +
+          E(x.label_he + ': נפתחו ' + x.opened + ', נמכרו ' + x.sold) + '">' +
+        '<div class="stack">' +
+          '<div class="b opened" style="height:' + Math.round(x.opened / max * 100) + '%"></div>' +
+          '<div class="b sold" style="height:' + Math.round(x.sold / max * 100) + '%"></div>' +
+        '</div>' +
+        '<span class="m">' + E(String(x.label_he).split(' ')[0].slice(0, 4)) + '</span>' +
+        '<span class="n">' + x.opened + '</span>' +
+      '</div>';
+    }).join('') + '</div>' +
+      '<div class="perf-legend"><span><i class="k-opened"></i>הזמנות שנפתחו</span>' +
+      '<span><i class="k-sold"></i>נמכרו בפועל</span></div>';
+
+    var diff = cur.opened - prev.opened;
+    var pct = prev.opened ? Math.round(diff / prev.opened * 100) : null;
+    var trendTxt = diff === 0
+      ? 'אותו מספר הזמנות כמו בחודש שעבר (' + prev.opened + ')'
+      : (diff > 0 ? '+' + diff : String(diff)) + ' לעומת חודש שעבר (' + prev.opened + ')' +
+        (pct !== null ? ' · ' + (pct > 0 ? '+' : '') + pct + '%' : '');
+
+    var inner =
+      '<div class="perf-now">' +
+        '<div><span class="k">נפתחו החודש</span><span class="v">' + cur.opened + '</span></div>' +
+        '<div><span class="k">נמכרו החודש</span><span class="v">' + cur.sold + '</span></div>' +
+        '<div><span class="k">נחתמו החודש</span><span class="v">' + (cur.signed || 0) + '</span></div>' +
+      '</div>' +
+      '<div class="perf-trend' + (diff > 0 ? ' up' : diff < 0 ? ' down' : '') + '">' + E(trendTxt) + '</div>' +
+      bars +
+      '<div class="perf-total">מאז ומתמיד: ' + ((perf.all_time || {}).opened || 0) + ' הזמנות · ' +
+        ((perf.all_time || {}).sold || 0) + ' נמכרו · ' +
+        ((perf.all_time || {}).open_now || 0) + ' פתוחות עכשיו</div>';
+
+    var h = card(title, perf.staff && perf.staff.name ? '' : '', inner);
+
+    if (perf.can_view_team && (perf.team || []).length) {
+      var rows = perf.team.map(function (t) {
+        return '<div class="list-row' + (t.is_me ? ' me' : '') + '" data-staff="' + E(t.id) + '">' +
+          '<div class="lines"><span class="t">' + E(t.name) + '</span>' +
+          '<span class="s">' + t.opened_this + ' החודש · ' + t.opened_last + ' בחודש שעבר · ' +
+            t.sold_this + ' נמכרו</span></div>' +
+          '<span class="tag">' + t.opened_this + '</span></div>';
+      }).join('');
+      h += card('הצוות החודש', '',
+        '<div class="list team-list">' + rows + '</div>' +
+        (perf.unassigned_deals
+          ? '<div class="empty small">' + perf.unassigned_deals +
+            ' עסקאות ישנות עדיין לא רשומות על אף איש מכירות — אפשר לשייך אותן בכרטיס הלקוח.</div>'
+          : ''));
+    }
+
+    host.innerHTML = h;
+
+    host.querySelectorAll('.team-list .list-row').forEach(function (r) {
+      r.addEventListener('click', function () { loadPerformance(r.getAttribute('data-staff')); });
+    });
   }
 
   function card(title, count, inner) {
@@ -323,6 +420,7 @@
     }, 180);
   });
 
+  // רענון שקט כשחוזרים ללשונית, ובכל 5 דקות
   setInterval(function () { if (!document.hidden) load(true); }, REFRESH_MS);
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && state.data) {

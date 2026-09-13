@@ -480,3 +480,31 @@ button, input {
   .row-meta { display: block; }
   .thumb { height: 46px; }
 }
+
+/* ---------- הביצועים שלי ---------- */
+.perf-now { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 10px; }
+.perf-now > div { display: flex; flex-direction: column; gap: 2px; }
+.perf-now .k { font-size: 11px; color: var(--text-fainter); }
+.perf-now .v { font-size: 22px; color: var(--text); font-variant-numeric: tabular-nums; }
+.perf-trend { font-size: 12px; color: var(--text-faint); margin-bottom: 12px; }
+.perf-trend.up { color: #6fbf8b; }
+.perf-trend.down { color: #d99a7f; }
+.perf-bars { display: flex; align-items: flex-end; gap: 6px; height: 96px; }
+.perf-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+.perf-col .stack {
+  flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px;
+}
+.perf-col .b { width: 42%; min-height: 2px; border-radius: 2px 2px 0 0; }
+.perf-col .b.opened { background: var(--accent); opacity: .75; }
+.perf-col .b.sold { background: #6fbf8b; opacity: .85; }
+.perf-col.now .b.opened { opacity: 1; }
+.perf-col .m { font-size: 10px; color: var(--text-fainter-2); }
+.perf-col .n { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.perf-legend { display: flex; gap: 14px; margin-top: 8px; font-size: 11px; color: var(--text-fainter); }
+.perf-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 5px; }
+.perf-legend .k-opened { background: var(--accent); }
+.perf-legend .k-sold { background: #6fbf8b; }
+.perf-total { font-size: 11.5px; color: var(--text-fainter-2); margin-top: 10px; }
+.team-list .list-row { cursor: pointer; }
+.team-list .list-row:hover { background: var(--hover-row); }
+.team-list .list-row.me .t { color: var(--accent-soft); }
