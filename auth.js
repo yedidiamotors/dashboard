@@ -124,15 +124,15 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+
   /* ---- ניווט משותף לכל המסכים ---- */
   var NAV = [
-    { label: 'סקירה כללית',    href: 'index.html' },
+    { label: 'סקירה כללית',       href: 'index.html' },
     { label: 'מלאי רכבים', href: 'inventory.html', perm: 'view_vehicle_files' },
-    { label: 'הזמנות בדרך',     soon: true },
-    { label: 'לקוחות ועסקאות', href: 'customers.html', perm: 'create_customer_deal' },
-    { label: 'מכולות ומכס',     soon: true },
-    { label: 'משתמשים והרשאות', href: 'users.html', perm: 'manage_staff_users' },
-    { label: 'לוג משתמשים', href: 'log.html', perm: 'view_access_log' }
+    { label: 'הזמנות בדרך',        href: 'orders.html', perm: 'view_vehicle_files', notRoles: ['sales'] },
+    { label: 'לקוחות ועסקאות',     href: 'customers.html', perm: 'create_customer_deal' },
+    { label: 'משתמשים והרשאות',    href: 'users.html', perm: 'manage_staff_users' },
+    { label: 'לוג משתמשים',        href: 'log.html',   perm: 'view_access_log' }
   ];
 
   /* ---- תפריט המבורגר למסכי טלפון ---- */
@@ -181,12 +181,15 @@
     var host = document.getElementById(containerId);
     if (!host) return;
     var perms = permissions || [];
+    var s = getSession();
+    var role = s && s.user ? s.user.role : '';
     host.innerHTML = NAV.map(function (n) {
       if (n.perm && perms.indexOf(n.perm) === -1) return '';
+      if (n.notRoles && n.notRoles.indexOf(role) > -1) return '';
       var active = n.href && n.href === currentHref;
       var cls = 'nav-item' + (active ? ' is-active' : (n.soon ? ' is-soon' : ''));
       return '<button class="' + cls + '" type="button" data-href="' + (n.href || '') + '"' +
-             (n.soon ? ' title="בבנייה"' : '') +
+             (n.soon ? ' title="\u05d1\u05d1\u05e0\u05d9\u05d9\u05d4"' : '') +
              '><span class="dot"></span>' + escapeHtml(n.label) + '</button>';
     }).join('');
     host.querySelectorAll('.nav-item').forEach(function (b) {
@@ -207,13 +210,13 @@
     clearSession: clearSession,
     logout: logout,
     roleHe: roleHe,
-    phoneHe: phoneHe,
     initials: initials,
     nis: nis,
     shortNis: shortNis,
     greetingFor: greetingFor,
     hhmm: hhmm,
     escapeHtml: escapeHtml,
-    renderNav: renderNav
+    renderNav: renderNav,
+    phoneHe: phoneHe
   };
 })(window);
