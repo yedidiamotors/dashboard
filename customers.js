@@ -201,7 +201,8 @@
       var lastTxt = last ? (last.vehicle ? E(last.vehicle) + ' · ' : '') + '<span class="deal-status ' + E(last.status) + '">' + E(last.status_he) + '</span>' : '<span class="c-sub">—</span>';
       var idTxt = c.customer_type === 'company' ? (c.company_reg_number ? 'ח.פ ' + c.company_reg_number : '—') : (c.id_number || '—');
       return '<div class="cust-row" data-id="' + E(c.id) + '">' +
-        '<div><div class="c-name">' + E(c.name) + (c.customer_type === 'company' ? '<span class="badge company">חברה</span>' : '') + '</div>' +
+        '<div><div class="c-name">' + E(c.name) + (c.customer_type === 'company' ? '<span class="badge company">חברה</span>' : '') +
+          (c.needs_contact_details ? '<span class="badge missing">חסרים פרטי קשר</span>' : '') + '</div>' +
           (c.contact_person ? '<div class="c-sub">איש קשר: ' + E(c.contact_person) + '</div>' : '') +
           '<div class="c-meta">' + E(YM.phoneHe(c.phone)) + ' · ' + E(idTxt) + '</div></div>' +
         '<div class="ltr c-phone">' + E(YM.phoneHe(c.phone)) + '</div>' +
@@ -304,6 +305,8 @@
       return '<span class="doc' + (open ? ' open' : '') + '">' + (x.drive_url ? '<a href="' + E(x.drive_url) + '" target="_blank" rel="noopener">' + E(x.doc_type_he) + '</a>' : E(x.doc_type_he)) +
         (open ? ' · ממתין להעלאה' + (mine && !closed ? ' <button class="doc-up" type="button" data-doc="' + E(x.id) + '" data-type="' + E(x.doc_type) + '">העלאה</button>' : '') : '') + '</span>';
     }).join('') + '</div>';
+    h += termsHtml(d, mine, closed);
+    h += agreementHtml(d, mine);
     if (d.deal_status !== 'cancelled') {
       h += '<div class="checklist" data-deal="' + E(d.id) + '"><div class="cl-head"><span>מסמכי לקוח · רישוי ומסירה</span><button class="btn-icon cl-toggle" type="button">הצג checklist</button></div><div class="cl-body" hidden></div></div>';
     }
@@ -326,6 +329,97 @@
       h += '</div>';
     }
     return h + '</div>';
+  }
+
+  /* ---------- תנאים מסחריים והסכם מכירה ---------- */
+  function termsHtml(d, mine, closed) {
+    var t = d.terms || {}, b = t.breakdown || {};
+    var has = t.sale_price != null;
+    var rows = has ? [
+      ['מחיר מכירה', YM.nis(b.total) + ' (כולל מע"מ ' + (t.vat_rate || 18) + '%)'],
+      ['לפני מע"מ', YM.nis(b.net) + ' · מע"מ ' + YM.nis(b.vat)],
+      t.down_payment ? ['מקדמה', YM.nis(t.down_payment)] : null,
+      t.trade_in_credit ? ['זיכוי טרייד-אין', YM.nis(t.trade_in_credit)] : null,
+      t.financing_amount ? ['מימון', YM.nis(t.financing_amount)] : null,
+      ['יתרה לתשלום', YM.nis(b.balance)],
+      ['מועד מסירה משוער', t.expected_delivery_date ? fmtDate(t.expected_delivery_date) : '—']
+    ].filter(Boolean) : [];
+
+    return '<div class="terms">' +
+      '<div class="cl-head"><span>תנאים מסחריים' + (t.locked ? ' · נעולים (ההסכם נחתם)' : '') + '</span>' +
+        (mine && !closed ? '<button class="btn-icon terms-edit" type="button">' + (has ? 'עריכה' : 'הזנת תנאים') + '</button>' : '') + '</div>' +
+      (has ? '<div class="terms-grid">' + rows.map(function (r) {
+          return '<div><span class="k">' + E(r[0]) + '</span><span class="v">' + E(r[1]) + '</span></div>';
+        }).join('') + '</div>' +
+        (t.warranty_text ? '<div class="terms-note">אחריות: ' + E(t.warranty_text) + '</div>' : '') +
+        (t.special_terms ? '<div class="terms-note">תנאים מיוחדים: ' + E(t.special_terms) + '</div>' : '')
+        : '<div class="empty small">טרם הוזנו מחיר מכירה ותנאי תשלום — הם נדרשים להנפקת הסכם.</div>') +
+      '</div>';
+  }
+
+  function agreementHtml(d, mine) {
+    var a = d.agreement;
+    var head = '<div class="cl-head"><span>הסכם מכירה</span>' +
+      (mine ? '<button class="btn-icon agr-preview" type="button">תצוגה מקדימה</button>' : '') + '</div>';
+    if (!a) {
+      return '<div class="agr">' + head +
+        '<div class="agr-row"><span class="empty small">לא הונפק הסכם.</span>' +
+        (mine && d.deal_status !== 'cancelled' && d.deal_status !== 'completed'
+          ? '<button class="btn-icon primary agr-issue" type="button">הנפקת הסכם לחתימה</button>' : '') + '</div></div>';
+    }
+    var signed = a.status === 'signed';
+    return '<div class="agr">' + head + '<div class="agr-row">' +
+      '<div><div class="t">' + (signed ? 'נחתם' : 'ממתין לחתימת הלקוח') + ' · גרסה ' + a.version + '</div>' +
+      '<div class="s">' + (signed
+          ? E(a.signer_name || '') + ' · ' + fmtDT(a.signed_at) + (a.sign_method === 'digital_portal' ? ' · חתימה דיגיטלית' : ' · חתימה ידנית')
+          : 'הונפק ' + fmtDate(a.issued_at) + (a.issued_by_name ? ' · ' + E(a.issued_by_name) : '') +
+            (a.expires_at ? ' · תקף עד ' + fmtDate(a.expires_at) : '')) + '</div>' +
+      '<div class="hash ltr" title="טביעת אצבע של המסמך">' + E(String(a.content_hash || '').slice(0, 16)) + '…</div></div>' +
+      '<div class="agr-btns">' +
+        (a.pdf_drive_url ? '<a class="btn-icon" href="' + E(a.pdf_drive_url) + '" target="_blank" rel="noopener">ההסכם החתום</a>' : '') +
+        (mine && !signed ? '<button class="btn-icon agr-cancel" type="button">ביטול ההסכם</button>' : '') +
+        (mine && signed ? '<button class="btn-icon agr-issue" type="button">הנפקת הסכם מתוקן</button>' : '') +
+      '</div></div></div>';
+  }
+
+  var tForm = document.getElementById('terms-form');
+  function openTerms(d) {
+    var t = d.terms || {};
+    tForm.reset(); tForm.deal_id.value = d.id;
+    document.getElementById('terms-line').textContent =
+      (d.vehicle ? d.vehicle.title + ' · VIN ' + (d.vehicle.vin || '—') : 'ללא רכב משויך');
+    tForm.sale_price.value = t.sale_price != null ? t.sale_price : '';
+    tForm.down_payment.value = t.down_payment != null ? t.down_payment : '';
+    tForm.trade_in_credit.value = t.trade_in_credit != null ? t.trade_in_credit : '';
+    tForm.financing_amount.value = t.financing_amount != null ? t.financing_amount : '';
+    tForm.expected_delivery_date.value = t.expected_delivery_date || '';
+    tForm.delivery_terms.value = t.delivery_terms || '';
+    tForm.warranty_text.value = t.warranty_text || '';
+    tForm.special_terms.value = t.special_terms || '';
+    tForm.vat_rate.value = t.vat_rate != null ? t.vat_rate : 18;
+    show('terms-modal');
+  }
+  if (tForm) tForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var terms = { deal_id: tForm.deal_id.value, sale_price: tForm.sale_price.value, vat_rate: tForm.vat_rate.value,
+      price_includes_vat: true, down_payment: tForm.down_payment.value, trade_in_credit: tForm.trade_in_credit.value,
+      financing_amount: tForm.financing_amount.value, expected_delivery_date: tForm.expected_delivery_date.value,
+      delivery_terms: tForm.delivery_terms.value, warranty_text: tForm.warranty_text.value, special_terms: tForm.special_terms.value };
+    var r = await YM.api('/deal/terms', { token: session.token, terms: terms });
+    notice(r.message_he || (r.ok ? 'נשמר.' : 'השמירה נכשלה.'), r.ok ? 'ok' : 'err');
+    if (r.ok) { hide('terms-modal'); openCard(state.cardId); }
+  });
+
+  async function previewAgreement(dealId) {
+    var r = await YM.api('/deal/agreement/preview', { token: session.token, deal_id: dealId });
+    if (r.ok !== true) { notice(r.message_he || 'לא ניתן להציג את ההסכם.', 'err'); return; }
+    document.getElementById('apv-body').innerHTML = r.html;
+    var warn = document.getElementById('apv-warn');
+    var gaps = (r.gaps || []);
+    warn.innerHTML = (r.reviewed_by_lawyer ? '' : '<div class="banner">נוסח ההסכם טרם אושר על ידי עורך דין — מומלץ לאשר לפני החתמת לקוח.</div>') +
+      (gaps.length ? '<div class="banner">חסר להנפקה: ' + E(gaps.join(', ')) + '</div>' : '');
+    show('apv-modal');
+    document.getElementById('apv-body').scrollTop = 0;
   }
 
   function bindCard(res) {
@@ -385,6 +479,37 @@
       if (assign) assign.addEventListener('click', function () {
         var d = (res.deals || []).filter(function (x) { return x.id === id; })[0];
         openDealForm(res.customer, d);
+      });
+
+      var te = el.querySelector('.terms-edit');
+      if (te) te.addEventListener('click', function () { openTerms(dl); });
+
+      var apv = el.querySelector('.agr-preview');
+      if (apv) apv.addEventListener('click', function () { previewAgreement(id); });
+
+      el.querySelectorAll('.agr-issue').forEach(function (b) {
+        b.addEventListener('click', async function () {
+          if (dl.agreement && dl.agreement.status === 'signed' &&
+              !confirm('ההסכם הקיים כבר נחתם. הנפקת הסכם מתוקן לא מבטלת אותו — היא יוצרת גרסה חדשה לחתימה. להמשיך?')) return;
+          b.disabled = true;
+          var r = await YM.api('/deal/agreement/issue', { token: session.token, deal_id: id });
+          if (r.ok !== true && r.gaps && r.gaps.length) {
+            notice('חסרים פרטים להנפקה: ' + r.gaps.join(', '), 'err');
+          } else {
+            notice(r.message_he || (r.ok ? 'ההסכם הונפק.' : 'ההנפקה נכשלה.'), r.ok ? 'ok' : 'err');
+          }
+          b.disabled = false;
+          if (r.ok) openCard(state.cardId);
+        });
+      });
+
+      var acl = el.querySelector('.agr-cancel');
+      if (acl) acl.addEventListener('click', async function () {
+        var reason = prompt('סיבת ביטול ההסכם:');
+        if (reason === null || !reason.trim()) return;
+        var r = await YM.api('/deal/agreement/cancel', { token: session.token, agreement_id: dl.agreement.id, reason: reason });
+        notice(r.message_he || (r.ok ? 'ההסכם בוטל.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
+        if (r.ok) openCard(state.cardId);
       });
     });
   }
