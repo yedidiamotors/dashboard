@@ -198,6 +198,9 @@
       return '<span class="doc' + (open ? ' open' : '') + '">' + (x.drive_url ? '<a href="' + E(x.drive_url) + '" target="_blank" rel="noopener">' + E(x.doc_type_he) + '</a>' : E(x.doc_type_he)) +
         (open ? ' · ממתין להעלאה' + (mine && !closed ? ' <button class="doc-up" type="button" data-doc="' + E(x.id) + '" data-type="' + E(x.doc_type) + '">העלאה</button>' : '') : '') + '</span>';
     }).join('') + '</div>';
+    if (v && d.deal_status !== 'cancelled') {
+      h += '<div class="checklist" data-deal="' + E(d.id) + '"><div class="cl-head"><span>רישוי ומסירה</span><button class="btn-icon cl-toggle" type="button">הצג checklist</button></div><div class="cl-body" hidden></div></div>';
+    }
     if (mine) {
       h += '<div class="actions">';
       if (!closed) {
@@ -232,6 +235,9 @@
 
     body.querySelectorAll('.deal').forEach(function (el) {
       var id = el.getAttribute('data-id');
+      var dl = (res.deals || []).filter(function (x) { return x.id === id; })[0] || {};
+      var closed = dl.deal_status === 'completed' || dl.deal_status === 'cancelled';
+      var mine = res.viewer && (res.viewer.role !== 'sales' || res.viewer.id === dl.created_by_staff_id);
       var sel = el.querySelector('.deal-status-sel');
       if (sel) sel.addEventListener('change', async function () {
         var st = sel.value;
@@ -259,6 +265,13 @@
         if (!upSel.value) return;
         pickFile({ scope: 'deal', target_id: id, document_id: null, doc_type: upSel.value });
         upSel.value = '';
+      });
+      var clt = el.querySelector('.cl-toggle');
+      if (clt) clt.addEventListener('click', function () {
+        var body = el.querySelector('.cl-body');
+        if (!body.hidden) { body.hidden = true; clt.textContent = 'הצג checklist'; return; }
+        body.hidden = false; clt.textContent = 'הסתר';
+        loadChecklist(id, body, mine && !closed);
       });
       var assign = el.querySelector('.deal-assign');
       if (assign) assign.addEventListener('click', function () {
@@ -420,6 +433,55 @@
     notice(r.message_he || (r.ok ? 'נשמר.' : 'השמירה נכשלה.'), r.ok ? 'ok' : 'err');
     if (r.ok) { hide('deal-modal'); await load(false); openCard(dForm.customer_id.value); }
   });
+
+  /* ---------- checklist רישוי ומסירה ---------- */
+  async function loadChecklist(dealId, body, editable) {
+    body.innerHTML = '<div class="empty small">טוען…</div>';
+    var r;
+    try { r = await YM.api('/deals/checklist', { token: session.token, deal_id: dealId }); }
+    catch (err) { body.innerHTML = '<div class="empty small">' + E(err.message) + '</div>'; return; }
+    if (r.ok !== true) { body.innerHTML = '<div class="empty small">' + E(r.message_he || 'לא ניתן לטעון.') + '</div>'; return; }
+    if (!r.items.length) { body.innerHTML = '<div class="empty small">' + E(r.message_he || 'אין דרישות.') + '</div>'; return; }
+    var pct = r.total ? Math.round(100 * r.done / r.total) : 0;
+    var h = '<div class="cl-progress"><div class="bar"><span style="width:' + pct + '%"></span></div>' +
+      '<div class="txt">' + r.done + ' / ' + r.total + ' אומתו · הרכב: ' + E(r.vehicle_status_he) + (r.licensing_completed ? ' · <b>הרישוי הושלם</b>' : '') + '</div></div>';
+    h += r.items.map(function (it) {
+      return '<div class="cl-item st-' + E(it.status) + '" data-id="' + E(it.id) + '">' +
+        '<div class="cl-main"><div class="cl-label">' + E(it.label_he) + (it.is_open_for_upload ? ' <span class="doc open">פתוח ללקוח</span>' : '') + '</div>' +
+          (it.description ? '<div class="cl-desc">' + E(it.description) + '</div>' : '') +
+          (it.notes ? '<div class="cl-notes">' + E(it.notes) + '</div>' : '') + '</div>' +
+        (editable
+          ? '<div class="cl-ctl"><select class="small cl-status">' +
+              [['missing','חסר'],['received','התקבל'],['verified','אומת']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === it.status ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+            '</select><button class="btn-icon cl-note" type="button" title="הערה">✎</button>' +
+            (can('open_document_request') && !it.is_open_for_upload ? '<button class="btn-icon cl-open" type="button" title="לבקש מהלקוח">בקש מהלקוח</button>' : '') + '</div>'
+          : '<div class="cl-ctl"><span class="doc">' + E(it.status_he) + '</span></div>') +
+      '</div>';
+    }).join('');
+    body.innerHTML = h;
+    body.querySelectorAll('.cl-item').forEach(function (row) {
+      var rid = row.getAttribute('data-id');
+      var sel = row.querySelector('.cl-status');
+      if (sel) sel.addEventListener('change', function () { setRequirement(dealId, body, editable, { requirement_id: rid, status: sel.value }); });
+      var nb = row.querySelector('.cl-note');
+      if (nb) nb.addEventListener('click', function () {
+        var cur = row.querySelector('.cl-notes'); var txt = prompt('הערה לדרישה:', cur ? cur.textContent : '');
+        if (txt === null) return;
+        setRequirement(dealId, body, editable, { requirement_id: rid, notes: txt });
+      });
+      var ob = row.querySelector('.cl-open');
+      if (ob) ob.addEventListener('click', function () { setRequirement(dealId, body, editable, { requirement_id: rid, open_for_upload: true }); });
+    });
+  }
+
+  async function setRequirement(dealId, body, editable, payload) {
+    payload.token = session.token;
+    var r;
+    try { r = await YM.api('/deals/requirement', payload); } catch (err) { r = { ok: false, message_he: err.message }; }
+    notice(r.message_he || (r.ok ? 'עודכן.' : 'העדכון נכשל.'), r.ok ? 'ok' : 'err');
+    loadChecklist(dealId, body, editable);
+    if (r.ok && r.licensing_completed) load(false);
+  }
 
   /* ---------- העלאת קבצים ל-Drive ---------- */
   var fileInput = document.getElementById('file-input');
