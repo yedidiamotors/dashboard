@@ -78,6 +78,30 @@
 .kv .v.num { font-variant-numeric: tabular-nums; }
 .kv .v.money { color: var(--text); font-weight: 500; }
 
+/* מפרט מה-VIN, מסמכי התיק, מקורות */
+.sect .note { font-size: 11.5px; color: var(--text-fainter-2); margin: 0 0 8px; line-height: 1.6; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .doc, .docs .doc {
+  font-size: 11.5px; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border-chip); color: var(--text-mid);
+  unicode-bidi: plaintext;
+}
+.docs { display: flex; flex-direction: column; gap: 6px; }
+.docs .doc { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; padding: 6px 10px; }
+.docs .doc a { color: var(--text); text-decoration: none; }
+.docs .doc a:hover { color: var(--accent-soft); }
+.docs .doc .m { font-size: 11px; color: var(--text-fainter); }
+.doc-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.doc-tools select { height: 32px; font-size: 12.5px; padding: 0 8px; }
+.btn-icon {
+  background: none; border: 1px solid var(--border-chip); border-radius: 5px;
+  color: var(--text-dim); cursor: pointer; font-size: 12px; padding: 5px 10px;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+.btn-icon:hover { border-color: var(--accent); color: var(--text); }
+.btn-icon:disabled { opacity: .35; cursor: not-allowed; }
+.src { border-inline-start: 2px solid var(--border-chip); padding: 2px 10px; margin-bottom: 8px; font-size: 12.5px; color: var(--text-mid); }
+.src .m { font-size: 11px; color: var(--text-fainter); display: block; }
+
 .wa-preview {
   margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border);
 }
