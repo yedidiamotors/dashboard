@@ -184,6 +184,47 @@
   </div>
 </div>
 
+<!-- תנאים מסחריים -->
+<div class="modal" id="terms-modal" hidden>
+  <div class="modal-box wide" role="dialog" aria-modal="true">
+    <button class="modal-x" type="button" data-close="terms-modal" aria-label="סגירה">×</button>
+    <h2>תנאים מסחריים</h2>
+    <form id="terms-form" class="form" novalidate>
+      <input type="hidden" name="deal_id">
+      <div class="sub" id="terms-line"></div>
+      <div class="grid2">
+        <div class="field"><label for="t-price">מחיר מכירה כולל מע"מ (₪)</label><input id="t-price" name="sale_price" inputmode="decimal" dir="ltr" required></div>
+        <div class="field"><label for="t-vat">שיעור מע"מ (%)</label><input id="t-vat" name="vat_rate" inputmode="decimal" dir="ltr" value="18"></div>
+        <div class="field"><label for="t-down">מקדמה (₪)</label><input id="t-down" name="down_payment" inputmode="decimal" dir="ltr"></div>
+        <div class="field"><label for="t-trade">זיכוי טרייד-אין (₪)</label><input id="t-trade" name="trade_in_credit" inputmode="decimal" dir="ltr"></div>
+        <div class="field"><label for="t-fin">מימון (₪)</label><input id="t-fin" name="financing_amount" inputmode="decimal" dir="ltr"></div>
+        <div class="field"><label for="t-del">מועד מסירה משוער</label><input id="t-del" name="expected_delivery_date" type="date" dir="ltr"></div>
+      </div>
+      <div class="field"><label for="t-delterms">תנאי מסירה</label><input id="t-delterms" name="delivery_terms" placeholder="למשל: מסירה באולם התצוגה בחיפה"></div>
+      <div class="field"><label for="t-warranty">אחריות</label><input id="t-warranty" name="warranty_text" placeholder="למשל: 3 שנים או 100,000 ק״מ"></div>
+      <div class="field"><label for="t-special">תנאים מיוחדים</label><input id="t-special" name="special_terms"></div>
+      <div class="hint">הסכומים נכנסים להסכם המכירה כפי שהם. אחרי חתימת ההסכם התנאים ננעלים — שינוי מחייב מנהל מערכת והסכם מתוקן.</div>
+      <div class="modal-actions">
+        <button class="btn-primary" type="submit">שמירה</button>
+        <button class="btn-ghost" type="button" data-close="terms-modal">ביטול</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- תצוגה מקדימה של ההסכם -->
+<div class="modal" id="apv-modal" hidden>
+  <div class="modal-box wide" role="dialog" aria-modal="true">
+    <button class="modal-x" type="button" data-close="apv-modal" aria-label="סגירה">×</button>
+    <h2>תצוגה מקדימה — הסכם מכירה</h2>
+    <div id="apv-warn"></div>
+    <div class="agr-preview-scroll" id="apv-body"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" type="button" data-close="apv-modal">סגירה</button>
+    </div>
+  </div>
+</div>
+
 <input type="file" id="file-input" hidden accept=".pdf,.jpg,.jpeg,.png,.heic,.webp,.doc,.docx">
 
 <script src="auth.js"></script>
