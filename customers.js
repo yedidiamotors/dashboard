@@ -355,6 +355,8 @@
     var t = d.terms || {}, b = t.breakdown || {};
     var has = t.sale_price != null;
     var rows = has ? [
+      t.list_price != null && t.discount ? ['מחיר מחירון', YM.nis(t.list_price)] : null,
+      t.discount ? ['הנחה', YM.nis(t.discount) + (t.discount_by ? ' · ' + t.discount_by : '')] : null,
       ['מחיר מכירה', YM.nis(b.total) + ' (כולל מע"מ ' + (t.vat_rate || 18) + '%)'],
       ['לפני מע"מ', YM.nis(b.net) + ' · מע"מ ' + YM.nis(b.vat)],
       t.down_payment ? ['מקדמה', YM.nis(t.down_payment)] : null,
@@ -373,7 +375,37 @@
         (t.warranty_text ? '<div class="terms-note">אחריות: ' + E(t.warranty_text) + '</div>' : '') +
         (t.special_terms ? '<div class="terms-note">תנאים מיוחדים: ' + E(t.special_terms) + '</div>' : '')
         : '<div class="empty small">טרם הוזנו מחיר מכירה ותנאי תשלום — הם נדרשים להנפקת הסכם.</div>') +
+      (t.discount_reason ? '<div class="terms-note">סיבת ההנחה: ' + E(t.discount_reason) + '</div>' : '') +
+      discountRequestHtml(d, t) +
       '</div>';
+  }
+
+  /* בקשת הנחה חריגה: מנהל המכירות מבקש, מנהל הרכש מאשר */
+  function discountRequestHtml(d, t) {
+    var card = state.card || {}, v = card.viewer || {};
+    var r = t.request;
+    var h = '';
+    if (r) {
+      h += '<div class="disc-req">' +
+        (r.approved_at
+          ? 'אושרה הנחה של ' + E(YM.nis(r.approved_amount)) + (r.approved_by ? ' · ' + E(r.approved_by) : '')
+          : 'ממתין לאישור מנהל הרכש: הנחה של ' + E(YM.nis(r.amount))) +
+        '<span class="s">' + E(r.reason || '') + (r.note ? ' · ' + E(r.note) : '') + '</span>' +
+        (card.can_set_price && !r.approved_at
+          ? '<span class="disc-acts">' +
+            '<button class="btn-icon primary disc-ok" type="button">אישור</button>' +
+            '<button class="btn-icon disc-no" type="button">דחייה</button></span>'
+          : '') +
+      '</div>';
+    }
+    if (card.can_discount && t.cap != null && !t.locked) {
+      h += '<div class="terms-note">תקרת הנחה ללא אישור: ' + E(YM.nis(t.cap)) +
+        ' <button class="linkish disc-ask" type="button">בקשת הנחה גבוהה יותר</button></div>';
+    }
+    if (t.trade_in_locked) {
+      h += '<div class="terms-note">זיכוי הטרייד-אין נגזר ממחיר הקנייה שקבע מנהל הרכש.</div>';
+    }
+    return h;
   }
 
   function agreementHtml(d, mine) {
@@ -410,6 +442,9 @@
     tForm.sale_price.value = t.sale_price != null ? t.sale_price : '';
     tForm.down_payment.value = t.down_payment != null ? t.down_payment : '';
     tForm.trade_in_credit.value = t.trade_in_credit != null ? t.trade_in_credit : '';
+    tForm.trade_in_credit.readOnly = !!t.trade_in_locked;
+    tForm.trade_in_credit.title = t.trade_in_locked
+      ? 'נגזר ממחיר הקנייה של רכב הטרייד-אין, שנקבע על ידי מנהל הרכש' : '';
     tForm.financing_amount.value = t.financing_amount != null ? t.financing_amount : '';
     tForm.expected_delivery_date.value = t.expected_delivery_date || '';
     tForm.delivery_terms.value = t.delivery_terms || '';
@@ -424,6 +459,15 @@
       price_includes_vat: true, down_payment: tForm.down_payment.value, trade_in_credit: tForm.trade_in_credit.value,
       financing_amount: tForm.financing_amount.value, expected_delivery_date: tForm.expected_delivery_date.value,
       delivery_terms: tForm.delivery_terms.value, warranty_text: tForm.warranty_text.value, special_terms: tForm.special_terms.value };
+    var t0 = (state.card && (state.card.deals || []).filter(function (x) { return x.id === terms.deal_id; })[0]) || {};
+    var list = (t0.terms || {}).list_price;
+    var want = Number(String(terms.sale_price).replace(/[^0-9.]/g, ''));
+    if (list != null && want && want < list) {
+      var why = prompt('הנחה של ' + YM.nis(list - want) + ' — מה הסיבה?',
+                       (t0.terms || {}).discount_reason || '');
+      if (why === null || !String(why).trim()) { notice('הנחה מחייבת סיבה.', 'err'); return; }
+      terms.discount_reason = why;
+    }
     var r = await YM.api('/deal/terms', { token: session.token, terms: terms });
     notice(r.message_he || (r.ok ? 'נשמר.' : 'השמירה נכשלה.'), r.ok ? 'ok' : 'err');
     if (r.ok) { hide('terms-modal'); openCard(state.cardId); }
@@ -468,6 +512,32 @@
         notice(r.message_he || (r.ok ? 'עודכן.' : 'העדכון נכשל.'), r.ok ? 'ok' : 'err');
         openCard(state.cardId); load(false);
       });
+      var ask = el.querySelector('.disc-ask');
+      if (ask) ask.addEventListener('click', async function () {
+        var amt = prompt('איזו הנחה לבקש? (₪)');
+        if (amt === null || !String(amt).trim()) return;
+        var why = prompt('נימוק לבקשה:');
+        if (why === null || !String(why).trim()) return;
+        var r = await YM.api('/deal/discount/request', { token: session.token, deal_id: id, amount: amt, reason: why });
+        notice(r.message_he || (r.ok ? 'נשלח.' : 'הבקשה נכשלה.'), r.ok ? 'ok' : 'err');
+        if (r.ok) openCard(state.cardId);
+      });
+      var dOk = el.querySelector('.disc-ok');
+      if (dOk) dOk.addEventListener('click', async function () {
+        var note = prompt('הערה לאישור (לא חובה):') || '';
+        var r = await YM.api('/deal/discount/decide', { token: session.token, deal_id: id, approve: true, note: note });
+        notice(r.message_he || (r.ok ? 'אושר.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
+        if (r.ok) openCard(state.cardId);
+      });
+      var dNo = el.querySelector('.disc-no');
+      if (dNo) dNo.addEventListener('click', async function () {
+        var note = prompt('סיבת הדחייה:');
+        if (note === null) return;
+        var r = await YM.api('/deal/discount/decide', { token: session.token, deal_id: id, approve: false, note: note });
+        notice(r.message_he || (r.ok ? 'נדחה.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
+        if (r.ok) openCard(state.cardId);
+      });
+
       var ownerSel = el.querySelector('.deal-owner-sel');
       if (ownerSel) {
         var ownerWas = ownerSel.value;

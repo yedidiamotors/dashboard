@@ -131,6 +131,7 @@
     { label: 'מלאי רכבים', href: 'inventory.html', perm: 'view_vehicle_files' },
     { label: 'הזמנות בדרך',        href: 'orders.html', perm: 'view_vehicle_files', notRoles: ['sales'] },
     { label: 'לקוחות ועסקאות',     href: 'customers.html', perm: 'create_customer_deal' },
+    { label: 'טרייד-אין',          href: 'tradein.html', perm: 'view_trade_in_vehicles' },
     { label: 'משתמשים והרשאות',    href: 'users.html', perm: 'manage_staff_users' },
     { label: 'לוג משתמשים',        href: 'log.html',   perm: 'view_access_log' }
   ];
