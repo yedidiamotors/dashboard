@@ -309,171 +309,14 @@
   }
 
   /* ---------- תמונות לאתר ----------
-     הסדר כאן הוא הסדר באתר: הראשונה היא התמונה הראשית.
-     המקור היחיד לאמת הוא vehicle_photos ב-Supabase; התיקייה בדרייב מסונכרנת אליו בכל פתיחה. */
-  var photoState = { vehicle_id: null, photos: [], can: false, folder: null, loading: false, err: null };
-
-  async function loadPhotos(vehicleId) {
-    photoState = { vehicle_id: vehicleId, photos: [], can: false, folder: null, loading: true, err: null };
-    renderPhotos();
-    var r;
-    try { r = await YM.api('/vehicle/photos', { token: session.token, vehicle_id: vehicleId }); }
-    catch (err) { r = { ok: false, message_he: 'אין תקשורת עם השרת.' }; }
-    if (photoState.vehicle_id !== vehicleId) return;   // הכרטיס הוחלף בינתיים
-    photoState.loading = false;
-    if (r.ok !== true) { photoState.err = r.message_he || 'לא ניתן לטעון את התמונות.'; renderPhotos(); return; }
-    photoState.photos = r.photos || [];
-    photoState.can = r.can_manage === true;
-    photoState.folder = r.folder_name || null;
-    renderPhotos();
+     המימוש עצמו יושב ב-photos.js ומשותף עם מסך הטרייד-אין. */
+  function loadPhotos(vehicleId) {
+    YM.photos.open({
+      hostId: 'photos-sect', inputId: 'photo-input', token: session.token,
+      onError: cardNotice,
+      onToast: function (t) { notice(t, 'ok'); }
+    }, { vehicle_id: vehicleId });
   }
-
-  function renderPhotos() {
-    var host = document.getElementById('photos-sect');
-    if (!host) return;
-    var s = photoState;
-    var h = '<h3>תמונות לאתר' + (s.folder ? ' · <span class="ltr">' + E(s.folder) + '</span>' : '') + '</h3>';
-
-    if (s.loading) { host.innerHTML = h + '<p class="note">טוען תמונות…</p>'; return; }
-    if (s.err)     { host.innerHTML = h + '<p class="note">' + E(s.err) + '</p>'; return; }
-
-    h += '<p class="note">הסדר כאן הוא הסדר באתר, והראשונה היא התמונה הראשית. ' +
-         'שינוי נכנס לאתר בבנייה הבאה שלו.</p>';
-
-    if (!s.photos.length) h += '<p class="note">אין עדיין תמונות לרכב הזה.</p>';
-    else h += '<div class="ph-grid">' + s.photos.map(function (p, i) {
-      var first = i === 0 && p.published;
-      return '<figure class="ph' + (p.published ? '' : ' is-hidden') + (first ? ' is-primary' : '') + '"' +
-          (s.can ? ' draggable="true"' : '') + ' data-id="' + E(p.id) + '" data-i="' + i + '">' +
-        // בלי loading="lazy": התמונות יושבות בתוך חלון גולל, והדפדפן לא מתחיל לטעון אותן שם
-        '<img src="' + E(p.view_url || '') + '" alt="' + E(p.filename || 'תמונת רכב') + '" decoding="async">' +
-        '<figcaption>' + (first ? 'ראשית' : String(i + 1)) + (p.published ? '' : ' · לא באתר') + '</figcaption>' +
-        (s.can ? '<div class="ph-acts">' +
-          '<button type="button" class="ph-b" data-act="fwd" ' + (i === 0 ? 'disabled' : '') + '>קדימה</button>' +
-          '<button type="button" class="ph-b" data-act="back" ' + (i === s.photos.length - 1 ? 'disabled' : '') + '>אחורה</button>' +
-          (first ? '' : '<button type="button" class="ph-b" data-act="primary">ראשית</button>') +
-          '<button type="button" class="ph-b" data-act="pub">' + (p.published ? 'הסתרה' : 'החזרה') + '</button>' +
-          '<button type="button" class="ph-b danger" data-act="del">מחיקה</button>' +
-        '</div>' : '') +
-      '</figure>';
-    }).join('') + '</div>';
-
-    if (s.can) h += '<div class="doc-tools"><button class="btn-icon" type="button" id="ph-up">הוספת תמונות</button>' +
-      '<span class="note-inline">JPG/PNG/WebP · עד 15MB לתמונה</span></div>';
-    else h += '<p class="note">אין לך הרשאה לשנות את תמונות האתר.</p>';
-
-    host.innerHTML = h;
-    bindPhotos();
-  }
-
-  function bindPhotos() {
-    var host = document.getElementById('photos-sect');
-    if (!host || !photoState.can) return;
-
-    host.querySelectorAll('.ph-b').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var fig = b.closest('.ph');
-        photoAction(b.getAttribute('data-act'), fig.getAttribute('data-id'), Number(fig.getAttribute('data-i')));
-      });
-    });
-
-    var dragFrom = null;
-    host.querySelectorAll('.ph').forEach(function (fig) {
-      fig.addEventListener('dragstart', function (e) {
-        dragFrom = Number(fig.getAttribute('data-i'));
-        fig.classList.add('dragging');
-        try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(dragFrom)); } catch (x) {}
-      });
-      fig.addEventListener('dragend', function () { fig.classList.remove('dragging'); dragFrom = null; });
-      fig.addEventListener('dragover', function (e) { e.preventDefault(); fig.classList.add('drop-here'); });
-      fig.addEventListener('dragleave', function () { fig.classList.remove('drop-here'); });
-      fig.addEventListener('drop', function (e) {
-        e.preventDefault(); fig.classList.remove('drop-here');
-        var from = dragFrom;
-        if (from === null || from === undefined) { var t = Number(e.dataTransfer.getData('text/plain')); from = isNaN(t) ? null : t; }
-        var to = Number(fig.getAttribute('data-i'));
-        if (from === null || from === to) return;
-        moveTo(from, to);
-      });
-    });
-
-    var up = document.getElementById('ph-up');
-    if (up) up.addEventListener('click', function () { photoInput.value = ''; photoInput.click(); });
-  }
-
-  function moveTo(from, to) {
-    var list = photoState.photos.slice();
-    var item = list.splice(from, 1)[0];
-    list.splice(to, 0, item);
-    photoState.photos = list;
-    renderPhotos();                       // תגובה מיידית; השרת מאשר מיד אחר כך
-    saveOrder();
-  }
-
-  async function saveOrder() {
-    var r = await YM.api('/vehicle/photos/reorder', {
-      token: session.token, vehicle_id: photoState.vehicle_id,
-      photo_ids: photoState.photos.map(function (p) { return p.id; })
-    });
-    if (r.ok !== true) { cardNotice(r.message_he || 'שמירת הסדר נכשלה.'); loadPhotos(photoState.vehicle_id); return; }
-    photoState.photos = r.photos || photoState.photos;
-    renderPhotos();
-  }
-
-  async function photoAction(act, id, i) {
-    if (act === 'fwd')  { moveTo(i, i - 1); return; }
-    if (act === 'back') { moveTo(i, i + 1); return; }
-
-    var body = { token: session.token }, path;
-    if (act === 'primary') { path = '/vehicle/photos/update'; body.photo_id = id; body.is_primary = true; }
-    else if (act === 'pub') {
-      var p = photoState.photos[i] || {};
-      path = '/vehicle/photos/update'; body.photo_id = id; body.published = !p.published;
-    } else if (act === 'del') {
-      if (!confirm('להסיר את התמונה מהאתר? הקובץ נשאר בדרייב, אבל הוא לא יחזור לרשימה.')) return;
-      path = '/vehicle/photos/delete'; body.photo_id = id;
-    } else return;
-
-    var r;
-    try { r = await YM.api(path, body); }
-    catch (err) { r = { ok: false, message_he: 'אין תקשורת עם השרת.' }; }
-    if (r.ok !== true) { cardNotice(r.message_he || 'הפעולה נכשלה.'); return; }
-    photoState.photos = r.photos || [];
-    renderPhotos();
-  }
-
-  /* ---------- העלאת תמונות לאתר ---------- */
-  var photoInput = document.getElementById('photo-input');
-  if (photoInput) photoInput.addEventListener('change', async function () {
-    var files = Array.prototype.slice.call(photoInput.files || []);
-    if (!files.length) return;
-    var vid = photoState.vehicle_id;
-    var btn = document.getElementById('ph-up');
-    var done = 0, failed = [];
-
-    for (var i = 0; i < files.length; i++) {
-      var f = files[i];
-      if (btn) { btn.disabled = true; btn.textContent = 'מעלה ' + (i + 1) + ' מתוך ' + files.length + '…'; }
-      if (f.size > 15 * 1024 * 1024) { failed.push(f.name + ' (גדול מ-15MB)'); continue; }
-      var fd = new FormData();
-      fd.append('token', session.token);
-      fd.append('vehicle_id', vid);
-      fd.append('file', f, f.name);
-      var r;
-      try {
-        var resp = await fetch(YM.API_BASE + '/vehicle/photos/upload', { method: 'POST', body: fd });
-        r = await resp.json().catch(function () { return { ok: false }; });
-      } catch (err) { r = { ok: false, message_he: 'אין תקשורת עם השרת.' }; }
-      if (r.ok) { done++; photoState.photos = r.photos || photoState.photos; }
-      else failed.push(f.name + (r.message_he ? ' — ' + r.message_he : ''));
-    }
-
-    photoInput.value = '';
-    if (photoState.vehicle_id !== vid) return;
-    renderPhotos();
-    if (failed.length) cardNotice('לא הועלו: ' + failed.join(' · '));
-    else if (done) notice(done === 1 ? 'התמונה נוספה.' : done + ' תמונות נוספו.', 'ok');
-  });
 
   /* ---------- העלאת קובץ לתיק הרכב (Drive דרך n8n) ---------- */
   var fileInput = document.getElementById('file-input');
@@ -601,7 +444,7 @@
   }
 
   /* ---------- אירועים ---------- */
-  function closeCard() { document.getElementById('modal').hidden = true; }
+  function closeCard() { document.getElementById('modal').hidden = true; YM.photos.close(); }
   document.getElementById('card-close').addEventListener('click', closeCard);
   document.getElementById('modal').addEventListener('click', function (e) {
     if (e.target.id === 'modal') closeCard();

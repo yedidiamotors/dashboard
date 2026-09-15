@@ -259,6 +259,9 @@
     }
     h += '</div>';
 
+    /* תמונות לאתר — הסדר והתמונה הראשית נקבעים כאן */
+    h += '<div class="sect" id="photos-sect"><h3>תמונות לאתר</h3><p class="note">טוען…</p></div>';
+
     /* עסקה משויכת */
     if (res.deal) {
       h += section('העסקה המשויכת', [
@@ -284,6 +287,12 @@
 
   function bindCard(res) {
     var t = res.trade_in || {}, v = res.viewer || {};
+
+    YM.photos.open({
+      hostId: 'photos-sect', inputId: 'photo-input', token: session.token,
+      onError: function (x) { notice(x, 'err'); },
+      onToast: function (x) { notice(x, 'ok'); }
+    }, { trade_in_id: t.id });
 
     var ed = document.getElementById('ti-edit');
     if (ed) ed.addEventListener('click', function () { openEdit(t); });
@@ -458,7 +467,7 @@
   }
 
   /* ---------- אירועים ---------- */
-  function closeCard() { document.getElementById('modal').hidden = true; }
+  function closeCard() { document.getElementById('modal').hidden = true; YM.photos.close(); }
   document.getElementById('card-close').addEventListener('click', closeCard);
   document.getElementById('modal').addEventListener('click', function (e) {
     if (e.target.id === 'modal') closeCard();
