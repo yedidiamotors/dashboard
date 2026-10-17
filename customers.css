@@ -344,3 +344,21 @@
   .cart-add select.small { min-width: 0; flex: 1 1 100%; }
   .order { padding: 12px 10px; }
 }
+
+/* ---- מסלול הלקוח (עריכה) ---- */
+.jr-ed { border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px 12px; background: #101216; display: flex; flex-direction: column; gap: 2px; }
+.jr-ed-h { font-size: 12.5px; color: var(--text); font-weight: 500; margin-bottom: 4px; }
+.jr-ed-h span { color: var(--text-fainter); font-weight: 400; }
+.jr-row { display: grid; grid-template-columns: 10px 130px 1fr; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border-soft); font-size: 13px; }
+.jr-row:first-of-type { border-top: 0; }
+.jr-row .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dot-idle); }
+.jr-row.done .dot { background: var(--ok); }
+.jr-row.active .dot { background: var(--warn); }
+.jr-l { color: var(--text-body); }
+.jr-c { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.jr-v { color: var(--text-faint); font-size: 12.5px; }
+.jr-c input.small, .jr-c select.small, .jr-opts input.small { height: 32px; padding: 0 8px; background: #0c0d10; color: var(--text-body); border: 1px solid var(--border-input); border-radius: 6px; font: inherit; font-size: 12.5px; color-scheme: dark; }
+.jr-c .grow, .jr-opts .grow { flex: 1; min-width: 150px; }
+.jr-opts { display: flex; gap: 10px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.jr-opts .check { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
+@media (max-width: 640px) { .jr-row { grid-template-columns: 10px 1fr; } .jr-row .jr-c { grid-column: 1 / -1; } }

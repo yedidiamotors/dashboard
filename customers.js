@@ -1219,13 +1219,12 @@
 
     // עסקאות: התקדמות + עדכונים
     (r.deals || []).forEach(function (d) {
-      var pr = d.progress || {}, cur = (pr.steps || []).filter(function (x) { return x.state === 'current'; })[0];
       h += '<div class="pt-deal" data-deal="' + E(d.id) + '"><div class="pt-deal-head"><b>' + E(d.title) + '</b>' +
-        '<span class="pt-mini">' + (cur ? 'הלקוח רואה: ' + E(cur.label_he) + ' (' + pr.current + '/6)' : (pr.current === 6 ? 'הלקוח רואה: נמסר' : 'אין רכב משויך — ציר ההתקדמות מוסתר')) + '</span>' +
         (d.waiting_on_customer ? '<span class="pt-flag">ממתין ללקוח: ' + d.waiting_on_customer + ' מסמכים</span>' : '') +
         (d.agreement_pending ? '<span class="pt-flag">הסכם ממתין לחתימה</span>' : '') + '</div>';
+      if (d.journey) h += journeyEditorHtml(d);
       if (!d.closed) {
-        h += '<form class="pt-post"><textarea rows="2" maxlength="1500" placeholder="עדכון ללקוח — יופיע באיזור האישי שלו (למשל: הרכב שוחרר מהמכס, נקבע מועד מסירה…)" required></textarea>' +
+        h += '<form class="pt-post"><textarea rows="2" maxlength="1500" placeholder="עדכון חופשי ללקוח — יופיע באיזור האישי שלו" required></textarea>' +
           '<div class="pt-post-row"><label class="check"><input type="checkbox" name="notify"' + (portal.data.customer.invoice_email ? '' : ' disabled') + '> לשלוח גם במייל' + (portal.data.customer.invoice_email ? '' : ' (אין מייל)') + '</label>' +
           '<button class="btn-primary small" type="submit">פרסום</button></div></form>';
       }
@@ -1259,6 +1258,97 @@
       }).join('') + '</div></details>';
     }
     return h;
+  }
+
+  /* ---------- מסלול הלקוח: איש המכירות מעדכן, הלקוח רואה מיד ----------
+     תשלום → שיוך → זמן הגעה (אם לא בארץ) → בארץ → התקנות ‖ רישוי → מועד מסירה.
+     כל עדכון יוצר הודעה אוטומטית באיזור האישי (ואם סומן — גם מייל). */
+  function journeyEditorHtml(d) {
+    var j = d.journey, r = j.raw || {}, by = {};
+    (j.steps || []).forEach(function (x) { by[x.key] = x; });
+    var closed = d.closed;
+    var dis = closed ? ' disabled' : '';
+    function row(label, state, body) {
+      return '<div class="jr-row ' + state + '"><span class="dot"></span><span class="jr-l">' + label + '</span><div class="jr-c">' + body + '</div></div>';
+    }
+    function sel(cur) {
+      return '<select class="small" data-j-status>' + [['', 'לא התחילו'], ['in_progress', 'בתהליך'], ['done', 'הסתיימו']].map(function (o) {
+        return '<option value="' + o[0] + '"' + ((cur || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+      }).join('') + '</select>';
+    }
+    var h = '<div class="jr-ed"><div class="jr-ed-h">מסלול הלקוח <span>— כל עדכון מופיע ללקוח באיזור האישי</span></div>';
+
+    // 1. תשלום
+    h += row('השלמת התשלום', by.payment.state,
+      r.payment_completed_at
+        ? '<span class="jr-v">הושלם ' + fmtDate(r.payment_completed_at) + '</span><button class="linkish" type="button" data-j="payment" data-done="0"' + dis + '>ביטול הסימון</button>'
+        : '<span class="jr-v">' + (r.balance > 0 ? 'יתרה ' + YM.nis(r.balance) : 'לא סומן') + '</span><button class="btn-ghost small" type="button" data-j="payment" data-done="1"' + dis + '>התשלום הושלם</button>');
+    // 2. שיוך
+    h += row('שיוך הרכב', by.assigned.state, '<span class="jr-v">' + (r.has_vehicle ? 'שויך · ' + E(r.vehicle_status_he || '') : 'לא שויך רכב — משייכים בעריכת העסקה') + '</span>');
+    // 3. זמן הגעה (רק לרכב שלא בארץ)
+    if (by.transit) {
+      h += row('זמן הגעה משוער', by.transit.state, j.in_israel
+        ? '<span class="jr-v">' + (r.arrival_eta ? 'היה משוער ל-' + fmtDate(r.arrival_eta) : '—') + '</span>'
+        : '<input type="date" class="small" data-j-date value="' + E(r.arrival_eta || '') + '"' + dis + '><button class="btn-ghost small" type="button" data-j="eta"' + dis + '>' + (r.arrival_eta ? 'עדכון' : 'שמירה') + '</button>');
+    }
+    // 4. בארץ
+    h += row('הרכב בארץ', by.arrived.state, j.in_israel
+      ? '<span class="jr-v">' + (r.arrived_israel_at ? 'סומן ' + fmtDate(r.arrived_israel_at) : 'לפי סטטוס הרכב במלאי') + '</span>' +
+        (r.arrived_israel_at ? '<button class="linkish" type="button" data-j="arrived" data-done="0"' + dis + '>ביטול הסימון</button>' : '')
+      : '<button class="btn-ghost small" type="button" data-j="arrived" data-done="1"' + (r.has_vehicle && !closed ? '' : ' disabled') + '>הרכב הגיע לארץ</button>');
+    // 5+6. במקביל
+    h += row('התקנות', by.install.state, sel(r.install_status) +
+      '<input type="text" class="small grow" data-j-note maxlength="300" placeholder="מה מותקן / צפי (מוצג ללקוח)" value="' + E(r.install_note || '') + '"' + dis + '>' +
+      '<button class="btn-ghost small" type="button" data-j="install"' + dis + '>שמירה</button>');
+    h += row('הוצאת רישיון', by.license.state, sel(r.license_status) +
+      (r.licensing_completed ? '<span class="jr-v">צ׳קליסט הרישוי הושלם</span>' : '') +
+      '<button class="btn-ghost small" type="button" data-j="license"' + dis + '>שמירה</button>');
+    // 7. מסירה
+    var dt = r.delivery_at ? toLocalInput(r.delivery_at) : '';
+    h += row('מועד מסירה', by.delivery.state,
+      '<input type="datetime-local" class="small" data-j-at value="' + E(dt) + '"' + dis + '>' +
+      '<input type="text" class="small grow" data-j-place maxlength="200" placeholder="מקום / הערה (מוצג ללקוח)" value="' + E(r.delivery_note || '') + '"' + dis + '>' +
+      '<button class="btn-ghost small" type="button" data-j="delivery"' + dis + '>' + (r.delivery_at ? 'עדכון' : 'קביעה') + '</button>' +
+      (r.delivery_at ? '<button class="linkish" type="button" data-j="delivery-clear"' + dis + '>ביטול</button>' : ''));
+
+    if (!closed) {
+      h += '<div class="jr-opts"><input type="text" class="small grow" data-j-msg maxlength="1000" placeholder="תוספת להודעה ללקוח (לא חובה)">' +
+        '<label class="check"><input type="checkbox" data-j-mail' + (portal.data.customer.invoice_email ? '' : ' disabled') + '> גם במייל' +
+        (portal.data.customer.invoice_email ? '' : ' (אין מייל)') + '</label></div>';
+    }
+    return h + '</div>';
+  }
+
+  function toLocalInput(iso) {
+    var d = new Date(iso), p = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function bindJourney(ed) {
+    var dealId = ed.closest('.pt-deal').getAttribute('data-deal');
+    ed.querySelectorAll('[data-j]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var row = b.closest('.jr-row'), step = b.getAttribute('data-j');
+        var msg = ed.querySelector('[data-j-msg]'), mail = ed.querySelector('[data-j-mail]');
+        var p = { action: 'journey', deal_id: dealId, message: msg ? msg.value.trim() : '', notify: mail && mail.checked ? 'email' : null };
+        if (step === 'payment' || step === 'arrived') { p.step = step; p.done = b.getAttribute('data-done') === '1'; }
+        else if (step === 'eta') {
+          var dv = row.querySelector('[data-j-date]').value;
+          if (!dv) { portalMsg('בחרו תאריך הגעה משוער.', 'err'); return; }
+          p.step = 'eta'; p.value = dv;
+        } else if (step === 'install' || step === 'license') {
+          p.step = step; p.status = row.querySelector('[data-j-status]').value || null;
+          if (step === 'install') p.note = row.querySelector('[data-j-note]').value;
+        } else if (step === 'delivery' || step === 'delivery-clear') {
+          var at = step === 'delivery' ? row.querySelector('[data-j-at]').value : '';
+          if (step === 'delivery' && !at) { portalMsg('בחרו תאריך ושעה למסירה.', 'err'); return; }
+          p.step = 'delivery'; p.at = at ? new Date(at).toISOString() : null;
+          p.note = step === 'delivery' ? row.querySelector('[data-j-place]').value : '';
+        }
+        var res = await portalAction(p, b);
+        if (res.ok) loadPortal(portal.customerId);
+      });
+    });
   }
 
   async function portalAction(payload, btn) {
@@ -1310,6 +1400,7 @@
         if (res && res.ok) loadPortal(portal.customerId);
       });
     });
+    host.querySelectorAll('.jr-ed').forEach(bindJourney);
     host.querySelectorAll('.pt-post').forEach(function (f) {
       f.addEventListener('submit', async function (e) {
         e.preventDefault();
