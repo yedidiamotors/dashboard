@@ -363,3 +363,17 @@
 .jr-opts .check { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
 @media (max-width: 640px) { .jr-row { grid-template-columns: 10px 1fr; } .jr-row .jr-c { grid-column: 1 / -1; } }
 .form label .req { color: var(--accent-soft); }
+
+/* ---------- רישום הרכב ברישיון ---------- */
+.reg-line {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--text-body);
+  border: 1px solid var(--border-soft); border-radius: 6px; padding: 8px 10px; background: rgba(255,255,255,.02);
+}
+.reg-line .k { font-size: 11.5px; color: var(--text-fainter); white-space: nowrap; }
+.reg-line .v { flex: 1; min-width: 200px; unicode-bidi: plaintext; }
+.reg-line .miss { display: block; font-size: 12px; color: var(--warn); margin-top: 2px; }
+.reg-line.warn { border-color: rgba(226,180,87,.45); background: rgba(226,180,87,.05); }
+.reg-box { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.reg-box > label:first-child { font-size: 14px; color: var(--text); }
+.form .muted { color: var(--text-fainter); font-size: 12px; }
+.warn-txt { color: var(--warn); }

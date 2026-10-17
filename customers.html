@@ -147,13 +147,25 @@
       <input type="hidden" name="customer_id">
       <div class="sub" id="deal-customer-line"></div>
 
-      <div class="field">
-        <label class="check"><input type="checkbox" name="end_user_same_as_customer" checked> הנהג / הרשום בפועל הוא הלקוח עצמו</label>
+      <div class="field reg-box">
+        <label>על שם מי יירשם הרכב ברישיון? <span class="req">*</span></label>
+        <div class="hint">אנחנו מוציאים את רישיון הרכב — מה שנקבע כאן הוא מה שייכתב ברישיון ובהסכם.</div>
+        <label class="check"><input type="radio" name="registration_type" value="customer"> <span id="reg-opt-customer">על שם הלקוח עצמו</span></label>
+        <label class="check"><input type="radio" name="registration_type" value="private"> על שם אדם פרטי אחר <small class="muted">(למשל: חברה קונה ורושמת על שם בעלים או עובד)</small></label>
+        <label class="check"><input type="radio" name="registration_type" value="company"> על שם חברה אחרת</label>
+        <div class="hint" id="reg-customer-line" hidden></div>
       </div>
-      <div class="grid2" id="end-user-fields" hidden>
-        <div class="field"><label for="d-eu-name">שם הנהג בפועל</label><input id="d-eu-name" name="end_user_name"></div>
-        <div class="field"><label for="d-eu-phone">טלפון הנהג</label><input id="d-eu-phone" name="end_user_phone" inputmode="tel" dir="ltr"></div>
-        <div class="field"><label for="d-eu-id">ת.ז. הנהג <span class="req">*</span></label><input id="d-eu-id" name="end_user_id_number" inputmode="numeric" dir="ltr"></div>
+      <div class="grid2" id="reg-private" hidden>
+        <div class="field"><label for="d-eu-name">שם מלא כפי שבתעודת הזהות <span class="req">*</span></label><input id="d-eu-name" name="end_user_name"></div>
+        <div class="field"><label for="d-eu-id">ת.ז. <span class="req">*</span></label><input id="d-eu-id" name="end_user_id_number" inputmode="numeric" maxlength="9" dir="ltr"></div>
+        <div class="field"><label for="d-eu-phone">טלפון <span class="req">*</span></label><input id="d-eu-phone" name="end_user_phone" inputmode="tel" dir="ltr"></div>
+        <div class="field"><label for="d-reg-addr-p">כתובת לרישום <span class="req">*</span></label><input id="d-reg-addr-p" name="registered_address_p" placeholder="רחוב, מספר, עיר"></div>
+      </div>
+      <div class="grid2" id="reg-company" hidden>
+        <div class="field"><label for="d-reg-name">שם החברה כפי שבתעודת ההתאגדות <span class="req">*</span></label><input id="d-reg-name" name="registered_name"></div>
+        <div class="field"><label for="d-reg-id">ח.פ <span class="req">*</span></label><input id="d-reg-id" name="registered_id_number" inputmode="numeric" maxlength="9" dir="ltr"></div>
+        <div class="field"><label for="d-reg-addr-c">כתובת החברה לרישום <span class="req">*</span></label><input id="d-reg-addr-c" name="registered_address_c" placeholder="רחוב, מספר, עיר"></div>
+        <div class="field"><label for="d-reg-phone">טלפון החברה</label><input id="d-reg-phone" name="registered_phone" inputmode="tel" dir="ltr"></div>
       </div>
 
       <div class="field">

@@ -321,10 +321,10 @@
     var h = '<div class="deal" data-id="' + E(d.id) + '">' +
       '<div class="head"><div class="veh">' + vehTxt + '</div><span class="deal-status ' + E(d.deal_status) + '">' + E(d.status_he) + '</span></div>' +
       '<div class="line">נפתחה ' + fmtDate(d.created_at) + (d.created_by_name ? ' · ' + E(d.created_by_name) : '') +
-        (!d.end_user_same_as_customer && d.end_user_name ? ' · נהג בפועל: ' + E(d.end_user_name) + (d.end_user_phone ? ' ' + E(YM.phoneHe(d.end_user_phone)) : '') : '') +
         (d.financing_required ? ' · במימון' + (d.financing_on_private_name ? ' (על שם פרטי)' : '') : '') +
         (d.customer_docs && d.customer_docs.total ? ' · מסמכי לקוח ' + d.customer_docs.done + '/' + d.customer_docs.total : '') + '</div>';
     h += ownerHtml(d);
+    h += regLineHtml(d, mine, closed);
     var docs = d.documents || [];
     h += '<div class="docs">' + docs.map(function (x) {
       var open = x.is_open_for_upload && !x.drive_url;
@@ -356,6 +356,17 @@
       h += '</div>';
     }
     return h + '</div>';
+  }
+
+  /* על שם מי נרשם הרכב ברישיון — אנחנו מוציאים את הרישיון, אז זה חייב להיות מדויק */
+  function regLineHtml(d, mine, closed) {
+    var r = d.registration || {}, miss = r.missing || [];
+    var who = r.type ? E(r.type_he) + ': <b>' + E(r.name || '—') + '</b>' + (r.id_number ? ' · ' + E(r.id_label) + ' ' + E(r.id_number) : '') +
+      (r.address ? ' · ' + E(r.address) : '') : '<b>לא נקבע</b>';
+    return '<div class="reg-line' + (miss.length ? ' warn' : '') + '"><span class="k">רישום ברישיון</span><span class="v">' + who +
+      (miss.length ? '<span class="miss">חסר: ' + E(miss.join(', ')) + '</span>' : '') +
+      (r.type && !r.explicit ? '<span class="miss">נקבע אוטומטית לעסקה ותיקה — לאשר</span>' : '') + '</span>' +
+      (mine && !closed ? '<button class="btn-icon reg-edit" type="button">עריכה</button>' : '') + '</div>';
   }
 
   /* מי העסקה רשומה עליו. השיוך נקבע אוטומטית למי שפתח אותה;
@@ -856,6 +867,8 @@
         openDealForm(res.customer, d);
       });
 
+      var re = el.querySelector('.reg-edit');
+      if (re) re.addEventListener('click', function () { openDealForm(res.customer, dl); });
       var te = el.querySelector('.terms-edit');
       if (te) te.addEventListener('click', function () { openTerms(dl); });
 
@@ -1015,21 +1028,36 @@
   var pickTimer;
 
   var dealCustomer = null;
+  function regType() { var r = dForm.querySelector('input[name="registration_type"]:checked'); return r ? r.value : ''; }
   function syncDealHints() {
-    document.getElementById('end-user-fields').hidden = dForm.end_user_same_as_customer.checked;
+    var rt = regType(), c = dealCustomer || {};
+    var isComp = c.customer_type === 'company';
+    document.getElementById('reg-private').hidden = rt !== 'private';
+    document.getElementById('reg-company').hidden = rt !== 'company';
+    document.getElementById('reg-opt-customer').textContent = isComp ? 'על שם החברה — ' + (c.name || '') : 'על שם הלקוח עצמו — ' + (c.name || '');
+    var cl = document.getElementById('reg-customer-line');
+    cl.hidden = rt !== 'customer';
+    if (rt === 'customer') {
+      var idn = isComp ? c.company_reg_number : c.id_number;
+      cl.innerHTML = 'ייכתב ברישיון: <b>' + E(c.name || '') + '</b> · ' + (isComp ? 'ח.פ ' : 'ת.ז ') + E(idn || '—') + ' · ' +
+        (c.address ? E(c.address) : '<span class="warn-txt">חסרה כתובת בכרטיס הלקוח — השלימו ב"עריכת פרטים"</span>');
+    }
     document.getElementById('fin-private-wrap').hidden = !dForm.financing_required.checked;
     if (!dForm.financing_required.checked) dForm.financing_on_private_name.checked = false;
-    var c = dealCustomer || {};
-    var priv = c.customer_type === 'individual' || !dForm.end_user_same_as_customer.checked;
-    var who = dForm.end_user_same_as_customer.checked ? (c.customer_type === 'company' ? 'החברה (' + (c.name || '') + ')' : 'הלקוח (' + (c.name || '') + ')') : 'הנהג בפועל (אדם פרטי)';
+    var priv = rt === 'private' || (rt === 'customer' && !isComp);
+    var compReg = rt === 'company' || (rt === 'customer' && isComp);
+    var who = rt === 'customer' ? (c.name || 'הלקוח') : rt === 'private' ? (dForm.end_user_name.value || 'אדם פרטי אחר') : rt === 'company' ? (dForm.registered_name.value || 'חברה אחרת') : 'טרם נבחר';
     var need = ['פרטים לחשבונית'];
-    if (c.customer_type === 'company') need.push('אישור בעלי מניות + מורשה חתימה');
+    if (isComp) need.push('אישור בעלי מניות + מורשה חתימה');
     if (priv) need.push('צילום ת.ז של מי שהרכב נרשם על שמו');
+    if (compReg) need.push('תעודת התאגדות של החברה שהרכב נרשם על שמה');
     if (dForm.financing_required.checked && dForm.financing_on_private_name.checked) need.push('ת.ז שני צדדים, רישיון נהיגה, ספח, פרטי אשראי');
-    need.push('בדיקת תוקף התעודות');
+    need.push('בדיקת תוקף התעודות', 'צילום רישיון הרכב אחרי הרישוי');
     document.getElementById('reg-hint').textContent = 'הרכב יירשם על שם: ' + who + '. מסמכים שייפתחו ב-checklist: ' + need.join(' · ') + '.';
   }
-  dForm.end_user_same_as_customer.addEventListener('change', syncDealHints);
+  dForm.querySelectorAll('input[name="registration_type"]').forEach(function (r) { r.addEventListener('change', syncDealHints); });
+  dForm.end_user_name.addEventListener('input', syncDealHints);
+  dForm.registered_name.addEventListener('input', syncDealHints);
   dForm.financing_required.addEventListener('change', syncDealHints);
   dForm.financing_on_private_name.addEventListener('change', syncDealHints);
 
@@ -1040,14 +1068,21 @@
     dealOrderId = deal ? null : (orderId || null);
     dForm.customer_id.value = customer.id;
     var ord = dealOrderId && ((state.orders && state.orders.orders) || []).filter(function (x) { return x.id === dealOrderId; })[0];
-    document.getElementById('deal-modal-title').textContent = deal ? 'שיוך רכב לעסקה' : (ord ? 'רכב נוסף להזמנה ' + ord.order_number : 'הזמנה חדשה');
+    document.getElementById('deal-modal-title').textContent = deal ? 'רכב ורישום' : (ord ? 'רכב נוסף להזמנה ' + ord.order_number : 'הזמנה חדשה');
     document.getElementById('deal-customer-line').textContent = 'לקוח: ' + customer.name + ' · ' + YM.phoneHe(customer.phone);
     document.getElementById('deal-save').textContent = deal ? 'שמירה' : (ord ? 'הוספה להזמנה' : 'פתיחת הזמנה');
     dealCustomer = customer;
     if (deal) {
-      dForm.end_user_same_as_customer.checked = deal.end_user_same_as_customer !== false;
+      var rg = deal.registration || {};
+      var t = rg.type || '';
+      dForm.querySelectorAll('input[name="registration_type"]').forEach(function (r) { r.checked = r.value === t; });
       dForm.end_user_name.value = deal.end_user_name || ''; dForm.end_user_phone.value = deal.end_user_phone ? YM.phoneHe(deal.end_user_phone) : '';
       dForm.end_user_id_number.value = deal.end_user_id_number || '';
+      if (t === 'private') dForm.registered_address_p.value = rg.address || '';
+      if (t === 'company') {
+        dForm.registered_name.value = rg.name || ''; dForm.registered_id_number.value = rg.id_number || '';
+        dForm.registered_address_c.value = rg.address || ''; dForm.registered_phone.value = rg.phone ? YM.phoneHe(rg.phone) : '';
+      }
       dForm.financing_required.checked = !!deal.financing_required;
       dForm.financing_on_private_name.checked = !!deal.financing_on_private_name;
     }
@@ -1096,9 +1131,23 @@
   dForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     var btn = document.getElementById('deal-save');
+    var rt = regType();
+    if (!rt) { notice('חובה לבחור על שם מי יירשם הרכב ברישיון.', 'err'); return; }
+    if (rt === 'private') {
+      if (!dForm.end_user_name.value.trim() || !dForm.end_user_phone.value.trim() || !dForm.registered_address_p.value.trim()) { notice('לרישום על שם אדם פרטי — חובה שם, ת.ז, טלפון וכתובת.', 'err'); return; }
+      if (!idValid(dForm.end_user_id_number.value)) { notice('מספר תעודת הזהות של בעל הרישום לא תקין.', 'err'); dForm.end_user_id_number.focus(); return; }
+    }
+    if (rt === 'company') {
+      if (!dForm.registered_name.value.trim() || !dForm.registered_address_c.value.trim()) { notice('לרישום על שם חברה — חובה שם החברה, ח.פ וכתובת.', 'err'); return; }
+      if (!idValid(dForm.registered_id_number.value)) { notice('מספר ח.פ של החברה לא תקין.', 'err'); dForm.registered_id_number.focus(); return; }
+    }
     var payload = {
       id: dealEditId, customer_id: dForm.customer_id.value,
-      end_user_same_as_customer: dForm.end_user_same_as_customer.checked,
+      registration_type: rt,
+      registered_name: dForm.registered_name.value, registered_id_number: dForm.registered_id_number.value,
+      registered_address: rt === 'private' ? dForm.registered_address_p.value : dForm.registered_address_c.value,
+      registered_phone: dForm.registered_phone.value,
+      end_user_same_as_customer: rt !== 'private',
       end_user_name: dForm.end_user_name.value, end_user_phone: dForm.end_user_phone.value, end_user_id_number: dForm.end_user_id_number.value,
       vehicle_file_id: dForm.vehicle_file_id.value || null,
       order_id: dealEditId ? null : dealOrderId,
