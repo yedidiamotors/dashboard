@@ -377,3 +377,5 @@
 .reg-box > label:first-child { font-size: 14px; color: var(--text); }
 .form .muted { color: var(--text-fainter); font-size: 12px; }
 .warn-txt { color: var(--warn); }
+.reg-line .gate { display: block; font-size: 12px; color: var(--text-faint); margin-top: 3px; }
+.reg-line .gate.ok { color: var(--ok); }

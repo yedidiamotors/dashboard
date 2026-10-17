@@ -365,7 +365,10 @@
       (r.address ? ' · ' + E(r.address) : '') : '<b>לא נקבע</b>';
     return '<div class="reg-line' + (miss.length ? ' warn' : '') + '"><span class="k">רישום ברישיון</span><span class="v">' + who +
       (miss.length ? '<span class="miss">חסר: ' + E(miss.join(', ')) + '</span>' : '') +
-      (r.type && !r.explicit ? '<span class="miss">נקבע אוטומטית לעסקה ותיקה — לאשר</span>' : '') + '</span>' +
+      (r.type && !r.explicit ? '<span class="miss">נקבע אוטומטית לעסקה ותיקה — לאשר</span>' : '') +
+      (d.license_gate && !d.license_gate.ok && d.deal_status !== 'completed'
+        ? '<span class="gate">הוצאת רישיון ומספר רישוי — רק אחרי: ' + E((d.license_gate.missing || []).join(' · ')) + '</span>'
+        : (d.license_gate && d.license_gate.ok && d.deal_status !== 'completed' ? '<span class="gate ok">אפשר להוציא רישיון</span>' : '')) + '</span>' +
       (mine && !closed ? '<button class="btn-icon reg-edit" type="button">עריכה</button>' : '') + '</div>';
   }
 
