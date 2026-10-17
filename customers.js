@@ -1221,21 +1221,23 @@
       openCard(r.customer.id);
       return;
     }
-    if (r.error === 'DUPLICATE') { renderDup(r.candidates || [], true); return; }
-    if (r.error === 'ID_TAKEN') { renderDup(r.candidates || [], false); return; }
+    if (r.error === 'PHONE_TAKEN' || r.error === 'DUPLICATE') { renderDup(r.candidates || [], 'phone'); return; }
+    if (r.error === 'ID_TAKEN') { renderDup(r.candidates || [], 'id'); return; }
     var box = document.getElementById('dup-box');
     box.hidden = false; box.className = 'banner';
     box.textContent = r.message_he || 'השמירה נכשלה.';
   }
 
-  function renderDup(list, canForce) {
+  function renderDup(list, why) {
     var box = document.getElementById('dup-box');
     box.hidden = false; box.className = 'dup-box';
-    box.innerHTML = '<div>' + (canForce ? 'נמצא לקוח קיים עם אותו מספר טלפון:' : 'כבר קיים לקוח עם מספר הזיהוי הזה — אי אפשר לפתוח לו כרטיס נוסף. פתחו את הכרטיס הקיים:') + '</div>' + list.map(function (c) {
+    box.innerHTML = '<div>' + (why === 'phone'
+        ? 'מספר הטלפון הזה כבר שייך ללקוח קיים — אי אפשר לפתוח כרטיס נוסף עם אותו טלפון. פתחו את הכרטיס הקיים (אם הרכב נרשם על בן/בת הזוג — בוחרים זאת ברישום הרכב בהזמנה):'
+        : 'כבר קיים לקוח עם מספר הזיהוי הזה — אי אפשר לפתוח לו כרטיס נוסף. פתחו את הכרטיס הקיים:') + '</div>' + list.map(function (c) {
       return '<div class="list-row"><div class="lines"><span class="t">' + E(c.name) + '</span><span class="s">' + E(YM.phoneHe(c.phone)) +
         (c.id_number ? ' · ' + E(c.id_number) : '') + '</span></div>' +
         '<div class="row-actions"><button class="btn-icon" type="button" data-open="' + E(c.id) + '">פתח את הלקוח הקיים</button></div></div>';
-    }).join('') + (canForce ? '<div class="row-actions"><button class="btn-icon danger" type="button" id="dup-force">זה לקוח אחר עם אותו טלפון — ליצור כרטיס נפרד</button></div>' : '');
+    }).join('');
     box.querySelectorAll('[data-open]').forEach(function (b) {
       b.addEventListener('click', async function () {
         hide('customer-modal');
@@ -1247,8 +1249,6 @@
         openCard(b.getAttribute('data-open'));
       });
     });
-    var force = document.getElementById('dup-force');
-    if (force) force.addEventListener('click', function () { saveCustomer(true); });
   }
 
   /* ---------- טופס עסקה ---------- */
