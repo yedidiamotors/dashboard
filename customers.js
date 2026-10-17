@@ -250,6 +250,8 @@
       (c.company_reg_number ? '<span class="tag">' + (c.company_reg_type === 'am' ? 'ע.מ ' : 'ח.פ ') + E(c.company_reg_number) + '</span>' : '') +
       (c.address ? '<span class="tag">' + E(c.address) + '</span>' : '') +
       (c.invoice_email ? '<span class="tag ltr">' + E(c.invoice_email) + '</span>' : '') + '</div>' +
+      (!idValid(c.customer_type === 'company' ? c.company_reg_number : c.id_number)
+        ? '<div class="gap-note">חסר מספר ' + (c.customer_type === 'company' ? 'ח.פ / ע.מ' : 'תעודת זהות') + ' — בלעדיו אי אפשר לפתוח הזמנה, והלקוח לא יוכל להיכנס לאיזור האישי. <button class="linkish" type="button" id="card-fix-id">להשלים</button></div>' : '') +
       (c.invoice_gaps && c.invoice_gaps.length ? '<div class="gap-note">חסר לחשבונית: ' + E(c.invoice_gaps.join(', ')) + ' — <button class="linkish" type="button" id="card-fix-invoice">להשלים</button></div>' : '') + '</div>';
 
     h += '<div class="card-tools">' +
@@ -765,6 +767,8 @@
     if (newDeal) newDeal.addEventListener('click', function () { openDealForm(res.customer, null); });
     var edit = document.getElementById('card-edit');
     if (edit) edit.addEventListener('click', function () { openCustomerForm(res.customer); });
+    var fixId = document.getElementById('card-fix-id');
+    if (fixId) fixId.addEventListener('click', function () { openCustomerForm(res.customer); });
     var fix = document.getElementById('card-fix-invoice');
     if (fix) fix.addEventListener('click', function () { openCustomerForm(res.customer); });
 
@@ -927,8 +931,31 @@
 
   cForm.addEventListener('submit', function (e) { e.preventDefault(); saveCustomer(false); });
 
+  // ספרת ביקורת של ת.ז / ח.פ ישראלי — אותה בדיקה שהשרת עושה
+  function idValid(v) {
+    var d = String(v || '').replace(/\D/g, '');
+    if (d.length < 5 || d.length > 9) return false;
+    d = ('000000000' + d).slice(-9);
+    if (d === '000000000') return false;
+    var s = 0;
+    for (var i = 0; i < 9; i++) { var x = Number(d[i]) * (i % 2 ? 2 : 1); s += x > 9 ? x - 9 : x; }
+    return s % 10 === 0;
+  }
+  function formError(text) {
+    var box = document.getElementById('dup-box');
+    box.hidden = false; box.className = 'banner'; box.textContent = text;
+  }
+
   async function saveCustomer(force) {
     var btn = document.getElementById('customer-save');
+    // זיהוי חובה: ת.ז ללקוח פרטי, ח.פ / ע.מ לחברה — בלעדיו אין לקוח, ובלעדיו הלקוח לא ייכנס לאיזור האישי
+    if (cType === 'company') {
+      if (!cForm.company_reg_number.value.trim()) { formError('חובה להזין ח.פ / ע.מ של החברה.'); cForm.company_reg_number.focus(); return; }
+      if (!idValid(cForm.company_reg_number.value)) { formError('מספר ח.פ / ע.מ לא תקין — בדקו מול תעודת ההתאגדות.'); cForm.company_reg_number.focus(); return; }
+    } else {
+      if (!cForm.id_number.value.trim()) { formError('חובה להזין מספר תעודת זהות של הלקוח.'); cForm.id_number.focus(); return; }
+      if (!idValid(cForm.id_number.value)) { formError('מספר תעודת הזהות לא תקין — בדקו מול התעודה (9 ספרות כולל ספרת ביקורת).'); cForm.id_number.focus(); return; }
+    }
     var payload = {
       id: cForm.id.value || null, customer_type: cType,
       full_name: cForm.full_name.value, company_name: cForm.company_name.value, contact_person: cForm.contact_person.value,
@@ -952,20 +979,21 @@
       openCard(r.customer.id);
       return;
     }
-    if (r.error === 'DUPLICATE') { renderDup(r.candidates || []); return; }
+    if (r.error === 'DUPLICATE') { renderDup(r.candidates || [], true); return; }
+    if (r.error === 'ID_TAKEN') { renderDup(r.candidates || [], false); return; }
     var box = document.getElementById('dup-box');
     box.hidden = false; box.className = 'banner';
     box.textContent = r.message_he || 'השמירה נכשלה.';
   }
 
-  function renderDup(list) {
+  function renderDup(list, canForce) {
     var box = document.getElementById('dup-box');
     box.hidden = false; box.className = 'dup-box';
-    box.innerHTML = '<div>נמצא לקוח קיים עם אותו טלפון או מספר זיהוי:</div>' + list.map(function (c) {
+    box.innerHTML = '<div>' + (canForce ? 'נמצא לקוח קיים עם אותו מספר טלפון:' : 'כבר קיים לקוח עם מספר הזיהוי הזה — אי אפשר לפתוח לו כרטיס נוסף. פתחו את הכרטיס הקיים:') + '</div>' + list.map(function (c) {
       return '<div class="list-row"><div class="lines"><span class="t">' + E(c.name) + '</span><span class="s">' + E(YM.phoneHe(c.phone)) +
         (c.id_number ? ' · ' + E(c.id_number) : '') + '</span></div>' +
         '<div class="row-actions"><button class="btn-icon" type="button" data-open="' + E(c.id) + '">פתח את הלקוח הקיים</button></div></div>';
-    }).join('') + '<div class="row-actions"><button class="btn-icon danger" type="button" id="dup-force">צור בכל זאת לקוח נפרד</button></div>';
+    }).join('') + (canForce ? '<div class="row-actions"><button class="btn-icon danger" type="button" id="dup-force">זה לקוח אחר עם אותו טלפון — ליצור כרטיס נפרד</button></div>' : '');
     box.querySelectorAll('[data-open]').forEach(function (b) {
       b.addEventListener('click', async function () {
         hide('customer-modal');
@@ -977,7 +1005,8 @@
         openCard(b.getAttribute('data-open'));
       });
     });
-    document.getElementById('dup-force').addEventListener('click', function () { saveCustomer(true); });
+    var force = document.getElementById('dup-force');
+    if (force) force.addEventListener('click', function () { saveCustomer(true); });
   }
 
   /* ---------- טופס עסקה ---------- */

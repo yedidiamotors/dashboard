@@ -114,8 +114,8 @@
       <div class="field" data-for="company" hidden><label for="c-comp">שם החברה</label><input id="c-comp" name="company_name" autocomplete="off"></div>
       <div class="field" data-for="company" hidden><label for="c-contact">איש קשר</label><input id="c-contact" name="contact_person" autocomplete="off"></div>
       <div class="field"><label for="c-phone">טלפון</label><input id="c-phone" name="phone" inputmode="tel" dir="ltr" placeholder="050-000-0000"></div>
-      <div class="field" data-for="individual"><label for="c-id">תעודת זהות</label><input id="c-id" name="id_number" inputmode="numeric" dir="ltr"></div>
-      <div class="field" data-for="company" hidden><label for="c-reg">מס׳ ח.פ / ע.מ</label>
+      <div class="field" data-for="individual"><label for="c-id">תעודת זהות <span class="req">*</span></label><input id="c-id" name="id_number" inputmode="numeric" maxlength="9" dir="ltr" required></div>
+      <div class="field" data-for="company" hidden><label for="c-reg">מס׳ ח.פ / ע.מ <span class="req">*</span></label>
         <div class="reg-row">
           <div class="seg small" id="reg-seg">
             <button type="button" class="is-active" data-reg="hp">ח.פ</button>
@@ -129,7 +129,7 @@
       <div class="field"><label for="c-addr">כתובת</label><input id="c-addr" name="address" autocomplete="off" placeholder="רחוב, מספר, עיר"></div>
       <div class="field"><label for="c-email">מייל לחשבונית</label><input id="c-email" name="invoice_email" type="email" dir="ltr" autocomplete="off" placeholder="name@company.co.il"></div>
       <div id="dup-box" hidden></div>
-      <div class="hint">הטלפון והזיהוי משמשים גם לכניסת הלקוח לעמוד האישי שלו — לוודא שהם נכונים. הכתובת והמייל נדרשים לחשבונית.</div>
+      <div class="hint">מספר הזיהוי חובה: בלעדיו אי אפשר להקים לקוח ולפתוח לו הזמנה. הלקוח נכנס לאיזור האישי עם הטלפון + מספר הזיהוי + קוד חד-פעמי — לוודא ששניהם נכונים. הכתובת והמייל נדרשים לחשבונית.</div>
       <div class="modal-actions">
         <button class="btn-primary" type="submit" id="customer-save">שמירה</button>
         <button class="btn-ghost" type="button" data-close="customer-modal">ביטול</button>
@@ -153,7 +153,7 @@
       <div class="grid2" id="end-user-fields" hidden>
         <div class="field"><label for="d-eu-name">שם הנהג בפועל</label><input id="d-eu-name" name="end_user_name"></div>
         <div class="field"><label for="d-eu-phone">טלפון הנהג</label><input id="d-eu-phone" name="end_user_phone" inputmode="tel" dir="ltr"></div>
-        <div class="field"><label for="d-eu-id">ת.ז. הנהג</label><input id="d-eu-id" name="end_user_id_number" inputmode="numeric" dir="ltr"></div>
+        <div class="field"><label for="d-eu-id">ת.ז. הנהג <span class="req">*</span></label><input id="d-eu-id" name="end_user_id_number" inputmode="numeric" dir="ltr"></div>
       </div>
 
       <div class="field">
