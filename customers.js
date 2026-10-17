@@ -327,7 +327,7 @@
         ? '<div class="gap-note">חסר מספר ' + (c.customer_type === 'company' ? 'ח.פ / ע.מ' : 'תעודת זהות') + ' — בלעדיו אי אפשר לפתוח הזמנה, והלקוח לא יוכל להיכנס לאיזור האישי. <button class="linkish" type="button" id="card-fix-id">להשלים</button></div>' : '') +
       (c.invoice_gaps && c.invoice_gaps.length ? '<div class="gap-note">חסר לחשבונית: ' + E(c.invoice_gaps.join(', ')) + ' — <button class="linkish" type="button" id="card-fix-invoice">להשלים</button></div>' : '') + '</div>';
 
-    var lc = c.lifecycle || {};
+    var lc = res.lifecycle || c.lifecycle || {}; // השרת מחזיר את lifecycle ברמה העליונה של התשובה
     if (lc.archived) {
       h += '<div class="archive-banner">הלקוח בארכיון' + (lc.archived_at ? ' מאז ' + fmtDate(lc.archived_at) : '') +
         (lc.archived_by ? ' · ע"י ' + E(lc.archived_by) : '') + (lc.archive_reason ? ' · ' + E(lc.archive_reason) : '') +
@@ -1033,7 +1033,7 @@
     var cDel = document.getElementById('card-delete');
     if (cDel) cDel.addEventListener('click', async function () {
       if (cDel.getAttribute('data-blocked')) { notice(cDel.getAttribute('title') || 'אי אפשר למחוק את הלקוח.', 'err'); return; }
-      var typed = await uiPrompt('מחיקה סופית של ' + res.customer.name + ' — הפרטים שלו יימחקו ולא יהיה אפשר לשחזר.' + (((res.customer.lifecycle || {}).delete_note_he) ? '\n' + res.customer.lifecycle.delete_note_he : '') + '\nלאישור הקלידו: מחק', '', 'מחיקה');
+      var typed = await uiPrompt('מחיקה סופית של ' + res.customer.name + ' — הפרטים שלו יימחקו ולא יהיה אפשר לשחזר.' + (((res.lifecycle || res.customer.lifecycle || {}).delete_note_he) ? '\n' + (res.lifecycle || res.customer.lifecycle).delete_note_he : '') + '\nלאישור הקלידו: מחק', '', 'מחיקה');
       if (typed === null) return;
       if (typed.trim() !== 'מחק') { notice('המחיקה לא בוצעה — לא הוקלד "מחק".', 'err'); return; }
       archiveCall({ action: 'customer_delete', customer_id: res.customer.id }, 'הלקוח נמחק.', function () { hide('card-modal'); });
