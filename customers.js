@@ -8,11 +8,13 @@
 
   var E = YM.escapeHtml;
   var session = YM.getSession();
-  if (!session) { location.replace('login.html'); return; }
+  var LOGIN_URL = 'login.html' + (location.search ? '?next=' + encodeURIComponent('customers.html' + location.search) : '');
+  if (!session) { location.replace(LOGIN_URL); return; }
   var perms = session.permissions || [];
   var can = function (k) { return perms.indexOf(k) > -1; };
 
-  var state = { rows: [], total: 0, q: '', type: '', loading: false, card: null, cardId: null };
+  var state = { rows: [], total: 0, q: '', type: '', archive: '', counts: {}, loading: false, card: null, cardId: null };
+  var LEAD_LINK = (function () { try { return new URLSearchParams(location.search).get('lead'); } catch (e) { return null; } })();
   var TYPES = [{ key: '', label: 'הכל' }, { key: 'individual', label: 'פרטיים' }, { key: 'company', label: 'חברות' }];
   var DEAL_DOCS = [
     ['memorandum_of_understanding', 'זיכרון דברים'], ['purchase_agreement', 'הסכם רכישה'],
@@ -33,7 +35,7 @@
     state.loading = true;
     var res;
     try {
-      res = await YM.api('/customers/list', { token: session.token, q: state.q, type: state.type || null, limit: 100 });
+      res = await YM.api('/customers/list', { token: session.token, q: state.q, type: state.type || null, archive: state.archive || null, limit: 100 });
     } catch (err) {
       state.loading = false;
       if (first) bootError(err.message); else notice(err.message, 'err');
@@ -42,16 +44,25 @@
     state.loading = false;
     if (res.ok !== true) {
       if (res.__status === 401 || ['INVALID_TOKEN','SESSION_EXPIRED','USER_INACTIVE','SESSION_INVALID'].indexOf(res.error) > -1) {
-        YM.clearSession(); location.replace('login.html'); return;
+        YM.clearSession(); location.replace(LOGIN_URL); return;
       }
       if (first) bootError(res.message_he || 'טעינת הלקוחות נכשלה.'); else notice(res.message_he, 'err');
       return;
     }
     state.rows = res.customers || [];
     state.total = res.total || 0;
+    state.counts = res.counts || {};
+    state.archiveMode = res.archive || 'active';
     render();
     document.getElementById('boot').hidden = true;
     document.getElementById('shell').hidden = false;
+    if (first && LEAD_LINK) openLeadLink();
+  }
+
+  /* קישור ישיר לליד (מהמייל): customers.html?lead=<id> */
+  function openLeadLink() {
+    var tab = document.querySelector('.tab[data-tab="leads"]');
+    if (tab) tab.click();
   }
 
   function bootError(text) {
@@ -73,7 +84,8 @@
     YM.renderNav('nav', 'customers.html', perms);
     document.getElementById('avatar').textContent = YM.initials(session.user && session.user.name);
     document.getElementById('eyebrow').textContent = YM.roleHe(session.user && session.user.role);
-    document.getElementById('meta-line').textContent = state.total + ' לקוחות' + (state.q ? ' · חיפוש: ' + state.q : '');
+    document.getElementById('meta-line').textContent = state.total + ' לקוחות' + (state.archiveMode === 'archived' ? ' בארכיון' : '') +
+      (state.q ? ' · חיפוש: ' + state.q + (state.archiveMode === 'all' ? ' (כולל ארכיון)' : '') : '');
 
     var open = state.rows.reduce(function (s, c) { return s + (Number(c.deals_open) || 0); }, 0);
     document.getElementById('side-box').innerHTML =
@@ -84,8 +96,18 @@
     tf.innerHTML = TYPES.map(function (t) {
       return '<button class="chip' + (state.type === t.key ? ' is-active' : '') + '" type="button" data-type="' + t.key + '">' + t.label + '</button>';
     }).join('');
-    tf.querySelectorAll('.chip').forEach(function (c) {
+    var am = state.archiveMode || 'active', cn = state.counts || {};
+    tf.innerHTML += '<span class="chip-sep" aria-hidden="true"></span>' + [
+      ['active', 'פעילים', cn.active], ['archived', 'ארכיון', cn.archived], ['all', 'הכל', null]
+    ].map(function (o) {
+      return '<button class="chip' + (am === o[0] ? ' is-active' : '') + '" type="button" data-arch="' + o[0] + '">' + o[1] +
+        (o[2] != null ? ' · ' + o[2] : '') + '</button>';
+    }).join('');
+    tf.querySelectorAll('.chip[data-type]').forEach(function (c) {
       c.addEventListener('click', function () { state.type = c.getAttribute('data-type'); load(false); });
+    });
+    tf.querySelectorAll('.chip[data-arch]').forEach(function (c) {
+      c.addEventListener('click', function () { state.archive = c.getAttribute('data-arch'); load(false); });
     });
     renderRows();
     if (!leads.loaded) loadLeads();
@@ -93,9 +115,10 @@
 
   /* ---------- לידים מהאתר ---------- */
   async function loadLeads() {
-    var r;
+    var r, seq = (leads.seq = (leads.seq || 0) + 1);
     try { r = await YM.api('/leads/list', { token: session.token, status: leads.filter || null, limit: 200 }); }
     catch (err) { document.getElementById('lead-rows').innerHTML = '<div class="empty">' + E(err.message) + '</div>'; return; }
+    if (seq !== leads.seq) return; // תשובה ישנה — כבר נשלחה בקשה חדשה יותר
     if (r.ok !== true) { document.getElementById('lead-rows').innerHTML = '<div class="empty">' + E(r.message_he || 'טעינת הלידים נכשלה.') + '</div>'; return; }
     leads.rows = r.leads || []; leads.counts = r.counts || {}; leads.loaded = true;
     var open = (Number(leads.counts.new) || 0) + (Number(leads.counts.contacted) || 0);
@@ -103,6 +126,16 @@
     badge.textContent = open; badge.hidden = !open;
     renderLeadFilters();
     renderLeads();
+    if (LEAD_LINK) {
+      var hit = document.querySelector('.lead-row[data-id="' + LEAD_LINK.replace(/[^0-9a-f-]/gi, '') + '"]');
+      if (!hit && leads.filter !== 'all') { leads.filter = 'all'; loadLeads(); return; }
+      if (hit) {
+        hit.classList.add('is-linked');
+        setTimeout(function () { hit.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 60);
+      } else notice('הליד מהקישור לא נמצא.', 'err');
+      LEAD_LINK = null;
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    }
   }
 
   function renderLeadFilters() {
@@ -192,7 +225,7 @@
   function renderRows() {
     var host = document.getElementById('rows');
     if (!state.rows.length) {
-      host.innerHTML = '<div class="empty">' + (state.q || state.type ? 'לא נמצאו לקוחות התואמים לחיפוש.' : 'עדיין אין לקוחות. פתחו את הראשון בכפתור "לקוח חדש".') + '</div>';
+      host.innerHTML = '<div class="empty">' + (state.q || state.type ? 'לא נמצאו לקוחות התואמים לחיפוש.' : state.archiveMode === 'archived' ? 'אין לקוחות בארכיון.' : 'עדיין אין לקוחות. פתחו את הראשון בכפתור "לקוח חדש".') + '</div>';
       document.getElementById('foot').innerHTML = '';
       return;
     }
@@ -200,9 +233,11 @@
       var last = c.last_deal;
       var lastTxt = last ? (last.vehicle ? E(last.vehicle) + ' · ' : '') + '<span class="deal-status ' + E(last.status) + '">' + E(last.status_he) + '</span>' : '<span class="c-sub">—</span>';
       var idTxt = c.customer_type === 'company' ? (c.company_reg_number ? 'ח.פ ' + c.company_reg_number : '—') : (c.id_number || '—');
-      return '<div class="cust-row" data-id="' + E(c.id) + '">' +
+      return '<div class="cust-row' + (c.archived ? ' is-archived' : '') + '" data-id="' + E(c.id) + '">' +
         '<div><div class="c-name">' + E(c.name) + (c.customer_type === 'company' ? '<span class="badge company">חברה</span>' : '') +
-          (c.needs_contact_details ? '<span class="badge missing">חסרים פרטי קשר</span>' : '') + '</div>' +
+          (c.needs_contact_details ? '<span class="badge missing">חסרים פרטי קשר</span>' : '') +
+          (c.archived ? '<span class="badge archived">בארכיון</span>' : '') + '</div>' +
+          (c.match_hint ? '<div class="c-hit">נמצא לפי: ' + E(c.match_hint) + '</div>' : '') +
           (c.contact_person ? '<div class="c-sub">איש קשר: ' + E(c.contact_person) + '</div>' : '') +
           '<div class="c-meta">' + E(YM.phoneHe(c.phone)) + ' · ' + E(idTxt) + '</div></div>' +
         '<div class="ltr c-phone">' + E(YM.phoneHe(c.phone)) + '</div>' +
@@ -254,15 +289,27 @@
         ? '<div class="gap-note">חסר מספר ' + (c.customer_type === 'company' ? 'ח.פ / ע.מ' : 'תעודת זהות') + ' — בלעדיו אי אפשר לפתוח הזמנה, והלקוח לא יוכל להיכנס לאיזור האישי. <button class="linkish" type="button" id="card-fix-id">להשלים</button></div>' : '') +
       (c.invoice_gaps && c.invoice_gaps.length ? '<div class="gap-note">חסר לחשבונית: ' + E(c.invoice_gaps.join(', ')) + ' — <button class="linkish" type="button" id="card-fix-invoice">להשלים</button></div>' : '') + '</div>';
 
+    var lc = c.lifecycle || {};
+    if (lc.archived) {
+      h += '<div class="archive-banner">הלקוח בארכיון' + (lc.archived_at ? ' מאז ' + fmtDate(lc.archived_at) : '') +
+        (lc.archived_by ? ' · ע"י ' + E(lc.archived_by) : '') + (lc.archive_reason ? ' · ' + E(lc.archive_reason) : '') +
+        '<span class="s">פתיחת הזמנה חדשה מחזירה אותו אוטומטית לפעילים.</span></div>';
+    }
     h += '<div class="card-tools">' +
       '<button class="btn-primary small" type="button" id="card-new-deal">הזמנה חדשה</button>' +
-      '<button class="btn-ghost small" type="button" id="card-edit">עריכת פרטים</button></div>';
+      '<button class="btn-ghost small" type="button" id="card-edit">עריכת פרטים</button>' +
+      (lc.archived ? '<button class="btn-ghost small" type="button" id="card-unarchive">שחזור מהארכיון</button>'
+                   : '<button class="btn-ghost small" type="button" id="card-archive"' + (lc.can_archive ? '' : ' data-blocked="1" title="' + E(lc.archive_message_he || '') + '"') + '>העברה לארכיון</button>') +
+      (lc.can_delete && lc.can_delete_perm ? '<button class="btn-ghost small danger" type="button" id="card-delete">מחיקת לקוח</button>' : '') +
+      '</div>';
 
     var orders = state.orders && state.orders.orders;
     if (orders) {
       // כל הזמנה מקבצת את הרכבים (העסקאות) שלה, עם עגלת התוספות והסיכום
       var byId = {}; deals.forEach(function (d) { byId[d.id] = d; });
-      h += '<div class="sect"><h3>הזמנות (' + orders.length + ')</h3>';
+      orders = orders.slice().sort(function (a, b) { return (a.archived ? 1 : 0) - (b.archived ? 1 : 0); });
+      var archN = orders.filter(function (o) { return o.archived; }).length;
+      h += '<div class="sect"><h3>הזמנות (' + (orders.length - archN) + (archN ? ' · ' + archN + ' בארכיון' : '') + ')</h3>';
       if (!orders.length) h += '<div class="empty small">אין הזמנות עדיין. "הזמנה חדשה" פותחת עגלה עם הרכב הראשון.</div>';
       orders.forEach(function (o) { h += orderHtml(o, byId, res.viewer); });
       h += '</div>';
@@ -403,12 +450,20 @@
   function orderHtml(o, byId, viewer) {
     var st = o.state || {}, t = (o.snapshot && o.snapshot.totals) || {};
     var live = ['closed', 'cancelled'].indexOf(st.code) === -1;
-    var h = '<div class="order" data-order="' + E(o.id) + '">' +
+    var ARCH_KIND = { delivered: 'נמסרה', cancelled: 'בוטלה', partial: 'נמסרה חלקית' };
+    var h = '<div class="order' + (o.archived ? ' archived' : '') + '" data-order="' + E(o.id) + '">' +
       '<div class="order-head"><div><div class="order-no">' + E(o.order_number) + '</div>' +
         '<div class="order-sub">נפתחה ' + fmtDate(o.created_at) + (o.created_by ? ' · ' + E(o.created_by) : '') +
           (o.sent_at ? ' · נשלחה ' + fmtDT(o.sent_at) + (o.sent_by ? ' ע"י ' + E(o.sent_by) : '') : '') +
           (o.approved_at && st.code === 'approved' ? ' · אושרה ' + fmtDT(o.approved_at) : '') + '</div></div>' +
-        '<span class="order-state st-' + E(st.code) + '">' + E(st.he || '') + '</span></div>';
+        (o.archived ? '<span class="order-state st-archived">בארכיון · ' + E(ARCH_KIND[o.archive_kind] || '') + '</span>'
+                    : '<span class="order-state st-' + E(st.code) + '">' + E(st.he || '') + '</span>') + '</div>';
+    if (o.archived) {
+      h += '<div class="order-archived-line">הועברה לארכיון ' + fmtDate(o.archived_at) + (o.archived_by ? ' ע"י ' + E(o.archived_by) : '') +
+        (o.archive_reason ? ' · ' + E(o.archive_reason) : '') +
+        ' <button class="linkish order-toggle" type="button">הצגת פרטים</button></div>';
+    }
+    h += '<div class="order-body">';
 
     if (st.code === 'change_requested' && o.change_request_note) {
       h += '<div class="order-alert">הלקוח ביקש שינוי (' + fmtDT(o.change_requested_at) + '): ' + E(o.change_request_note) +
@@ -431,7 +486,8 @@
     if (t.count && !t.priced) h += '<div class="terms-note">לחלק מהרכבים עוד אין מחיר מכירה — הסכום חלקי.</div>';
     if (o.pending_lines) h += '<div class="terms-note warn">' + o.pending_lines + ' שורות ממתינות לאישור מנהל — עד אז לא ניתן לשלוח את ההזמנה.</div>';
 
-    if (live) {
+    var ac = o.archive_check || {};
+    if (live && !o.archived) {
       h += '<div class="order-acts">';
       if (can('create_customer_deal')) h += '<button class="btn-icon order-add-veh" type="button">+ רכב נוסף להזמנה</button>';
       if (o.can_send) {
@@ -439,9 +495,15 @@
           (['sent', 'approved', 'changed', 'change_requested'].indexOf(st.code) > -1 && o.sent_at ? 'שליחה מחדש ללקוח' : 'שליחה ללקוח לאישור') + '</button>';
         if (st.code === 'sent') h += '<button class="btn-icon order-withdraw" type="button">החזרה להכנה</button>';
       }
+      if (ac.ok) h += '<button class="btn-icon order-archive" type="button">העברה לארכיון</button>';
       h += '</div>';
+    } else if (!o.archived && ac.ok) {
+      h += '<div class="order-acts"><button class="btn-icon order-archive" type="button">העברה לארכיון</button></div>';
     }
-    return h + '</div>';
+    if (o.archived && can('create_customer_deal')) {
+      h += '<div class="order-acts"><button class="btn-icon order-unarchive" type="button">שחזור מהארכיון</button></div>';
+    }
+    return h + '</div></div>';
   }
 
   function sumCell(k, v, strong) {
@@ -493,6 +555,15 @@
     return h + '</div>';
   }
 
+  async function archiveCall(payload, okText, after) {
+    payload.token = session.token;
+    var r;
+    try { r = await YM.api('/archive/action', payload); } catch (err) { r = { ok: false, message_he: err.message }; }
+    notice(r.ok ? okText : (r.message_he || 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
+    if (r.ok) { if (after) after(r); else openCard(state.cardId); load(false); }
+    return r;
+  }
+
   async function orderCall(payload, okReload) {
     payload.token = session.token;
     var r;
@@ -511,6 +582,23 @@
       if (addVeh) addVeh.addEventListener('click', function () { openDealForm(res.customer, null, oid); });
       var send = el.querySelector('.order-send');
       if (send) send.addEventListener('click', function () { openSend(o, res.customer); });
+      var arc = el.querySelector('.order-archive');
+      if (arc) arc.addEventListener('click', function () {
+        var ac = o.archive_check || {};
+        var what = ac.kind === 'delivered' ? 'כל הרכבים בהזמנה נמסרו.' : ac.kind === 'partial' ? 'חלק מהרכבים נמסרו וחלק בוטלו.' : 'ההזמנה בוטלה / לא הושלמה.';
+        var reason = prompt(what + ' להעביר את ' + (o.order_number || 'ההזמנה') + ' לארכיון?\nסיבה / הערה (לא חובה):', '');
+        if (reason === null) return;
+        archiveCall({ action: 'order_archive', order_id: oid, reason: reason }, 'ההזמנה הועברה לארכיון.');
+      });
+      var unarc = el.querySelector('.order-unarchive');
+      if (unarc) unarc.addEventListener('click', function () {
+        archiveCall({ action: 'order_unarchive', order_id: oid }, 'ההזמנה הוחזרה מהארכיון.');
+      });
+      var tg = el.querySelector('.order-toggle');
+      if (tg) tg.addEventListener('click', function () {
+        var open = el.classList.toggle('open');
+        tg.textContent = open ? 'הסתרת פרטים' : 'הצגת פרטים';
+      });
       var wd = el.querySelector('.order-withdraw');
       if (wd) wd.addEventListener('click', function () {
         if (!confirm('להחזיר את ההזמנה להכנה? הלקוח לא יוכל לאשר אותה עד שתישלח שוב.')) return;
@@ -781,6 +869,24 @@
     if (newDeal) newDeal.addEventListener('click', function () { openDealForm(res.customer, null); });
     var edit = document.getElementById('card-edit');
     if (edit) edit.addEventListener('click', function () { openCustomerForm(res.customer); });
+    var cArc = document.getElementById('card-archive');
+    if (cArc) cArc.addEventListener('click', function () {
+      if (cArc.getAttribute('data-blocked')) { notice(cArc.getAttribute('title') || 'אי אפשר להעביר לארכיון כרגע.', 'err'); return; }
+      var reason = prompt('להעביר את ' + res.customer.name + ' לארכיון?\nההזמנות שלו יעברו איתו. הלקוח עדיין יימצא בחיפוש.\nסיבה / הערה (לא חובה):', '');
+      if (reason === null) return;
+      archiveCall({ action: 'customer_archive', customer_id: res.customer.id, reason: reason }, 'הלקוח הועבר לארכיון.');
+    });
+    var cUn = document.getElementById('card-unarchive');
+    if (cUn) cUn.addEventListener('click', function () {
+      archiveCall({ action: 'customer_unarchive', customer_id: res.customer.id }, 'הלקוח הוחזר לפעילים.');
+    });
+    var cDel = document.getElementById('card-delete');
+    if (cDel) cDel.addEventListener('click', function () {
+      var typed = prompt('מחיקה סופית של ' + res.customer.name + ' — הפרטים יימחקו ולא יהיה אפשר לשחזר.\nלאישור הקלידו: מחק');
+      if (typed === null) return;
+      if (typed.trim() !== 'מחק') { notice('המחיקה לא בוצעה — לא הוקלד "מחק".', 'err'); return; }
+      archiveCall({ action: 'customer_delete', customer_id: res.customer.id }, 'הלקוח נמחק.', function () { hide('card-modal'); });
+    });
     var fixId = document.getElementById('card-fix-id');
     if (fixId) fixId.addEventListener('click', function () { openCustomerForm(res.customer); });
     var fix = document.getElementById('card-fix-invoice');

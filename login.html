@@ -107,8 +107,16 @@
   var currentPhone = '';
   var resendTimer = null;
 
+  // לאן לחזור אחרי הכניסה (למשל קישור לליד מהמייל). רק דף פנימי של הפאנל.
+  var NEXT = (function () {
+    try {
+      var n = new URLSearchParams(location.search).get('next') || '';
+      return /^[a-z]+\.html(\?[A-Za-z0-9=&_%-]*)?$/.test(n) ? n : 'index.html';
+    } catch (e) { return 'index.html'; }
+  })();
+
   // כבר מחוברים? ישר פנימה.
-  if (YM.getSession()) { location.replace('index.html'); return; }
+  if (YM.getSession()) { location.replace(NEXT); return; }
 
   function show(el, text, kind) {
     el.textContent = text;
@@ -209,7 +217,7 @@
         return;
       }
       YM.saveSession(res);
-      location.replace('index.html');
+      location.replace(NEXT);
     } catch (err) {
       show(codeMsg, err.message);
     } finally {
