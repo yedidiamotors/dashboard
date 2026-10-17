@@ -223,11 +223,18 @@
     state.cardId = id;
     document.getElementById('card-body').innerHTML = '<div class="empty">טוען…</div>';
     show('card-modal');
-    var res;
-    try { res = await YM.api('/customers/card', { token: session.token, id: id }); }
+    var res, ord;
+    try {
+      var both = await Promise.all([
+        YM.api('/customers/card', { token: session.token, id: id }),
+        YM.api('/orders/action', { token: session.token, action: 'customer', customer_id: id }).catch(function () { return null; })
+      ]);
+      res = both[0]; ord = both[1];
+    }
     catch (err) { document.getElementById('card-body').innerHTML = '<div class="empty">' + E(err.message) + '</div>'; return; }
     if (res.ok !== true) { document.getElementById('card-body').innerHTML = '<div class="empty">' + E(res.message_he || 'לא ניתן להציג את הלקוח.') + '</div>'; return; }
     state.card = res;
+    state.orders = ord && ord.ok === true ? ord : null;
     document.getElementById('card-body').innerHTML = cardHtml(res);
     bindCard(res);
     loadPortal(id);
@@ -246,13 +253,23 @@
       (c.invoice_gaps && c.invoice_gaps.length ? '<div class="gap-note">חסר לחשבונית: ' + E(c.invoice_gaps.join(', ')) + ' — <button class="linkish" type="button" id="card-fix-invoice">להשלים</button></div>' : '') + '</div>';
 
     h += '<div class="card-tools">' +
-      '<button class="btn-primary small" type="button" id="card-new-deal">עסקה חדשה</button>' +
+      '<button class="btn-primary small" type="button" id="card-new-deal">הזמנה חדשה</button>' +
       '<button class="btn-ghost small" type="button" id="card-edit">עריכת פרטים</button></div>';
 
-    h += '<div class="sect"><h3>עסקאות (' + deals.length + ')</h3>';
-    if (!deals.length) h += '<div class="empty small">אין עסקאות עדיין.</div>';
-    deals.forEach(function (d) { h += dealHtml(d, res.viewer); });
-    h += '</div>';
+    var orders = state.orders && state.orders.orders;
+    if (orders) {
+      // כל הזמנה מקבצת את הרכבים (העסקאות) שלה, עם עגלת התוספות והסיכום
+      var byId = {}; deals.forEach(function (d) { byId[d.id] = d; });
+      h += '<div class="sect"><h3>הזמנות (' + orders.length + ')</h3>';
+      if (!orders.length) h += '<div class="empty small">אין הזמנות עדיין. "הזמנה חדשה" פותחת עגלה עם הרכב הראשון.</div>';
+      orders.forEach(function (o) { h += orderHtml(o, byId, res.viewer); });
+      h += '</div>';
+    } else {
+      h += '<div class="sect"><h3>עסקאות (' + deals.length + ')</h3>';
+      if (!deals.length) h += '<div class="empty small">אין עסקאות עדיין.</div>';
+      deals.forEach(function (d) { h += dealHtml(d, res.viewer); });
+      h += '</div>';
+    }
 
     // ההרשאה נבדקת בשרת; סשן שנפתח לפני הוספת ההרשאה עדיין לא מכיר אותה ברשימה המקומית
     if (can('manage_customer_portal') || can('create_customer_deal')) {
@@ -313,6 +330,7 @@
         (open ? ' · ממתין להעלאה' + (mine && !closed ? ' <button class="doc-up" type="button" data-doc="' + E(x.id) + '" data-type="' + E(x.doc_type) + '">העלאה</button>' : '') : '') + '</span>';
     }).join('') + '</div>';
     h += termsHtml(d, mine, closed);
+    h += cartHtml(d);
     h += agreementHtml(d, mine);
     if (d.deal_status !== 'cancelled') {
       h += '<div class="checklist" data-deal="' + E(d.id) + '"><div class="cl-head"><span>מסמכי לקוח · רישוי ומסירה</span><button class="btn-icon cl-toggle" type="button">הצג checklist</button></div><div class="cl-body" hidden></div></div>';
@@ -354,6 +372,252 @@
       '<select class="small deal-owner-sel" aria-label="איש המכירות שהעסקה רשומה עליו">' +
       (d.sales_owner_staff_id ? '' : '<option value="">— לא משויכת —</option>') +
       opts + '</select></div>';
+  }
+
+  /* ---------- הזמנה (עגלה): רכבים, תוספות, שליחה לאישור הלקוח ---------- */
+  function cartLookup(dealId) {
+    var os = (state.orders && state.orders.orders) || [];
+    for (var i = 0; i < os.length; i++) {
+      var ds = os[i].deals || [];
+      for (var j = 0; j < ds.length; j++) if (ds[j].deal_id === dealId) return { order: os[i], deal: ds[j] };
+    }
+    return null;
+  }
+
+  function orderHtml(o, byId, viewer) {
+    var st = o.state || {}, t = (o.snapshot && o.snapshot.totals) || {};
+    var live = ['closed', 'cancelled'].indexOf(st.code) === -1;
+    var h = '<div class="order" data-order="' + E(o.id) + '">' +
+      '<div class="order-head"><div><div class="order-no">' + E(o.order_number) + '</div>' +
+        '<div class="order-sub">נפתחה ' + fmtDate(o.created_at) + (o.created_by ? ' · ' + E(o.created_by) : '') +
+          (o.sent_at ? ' · נשלחה ' + fmtDT(o.sent_at) + (o.sent_by ? ' ע"י ' + E(o.sent_by) : '') : '') +
+          (o.approved_at && st.code === 'approved' ? ' · אושרה ' + fmtDT(o.approved_at) : '') + '</div></div>' +
+        '<span class="order-state st-' + E(st.code) + '">' + E(st.he || '') + '</span></div>';
+
+    if (st.code === 'change_requested' && o.change_request_note) {
+      h += '<div class="order-alert">הלקוח ביקש שינוי (' + fmtDT(o.change_requested_at) + '): ' + E(o.change_request_note) +
+        '<span class="s">אחרי העדכון — לשלוח שוב לאישור.</span></div>';
+    }
+    if (st.code === 'changed') {
+      h += '<div class="order-alert">ההזמנה השתנתה אחרי ' + (o.stored_status === 'approved' ? 'שהלקוח אישר אותה' : 'שנשלחה ללקוח') +
+        '. האישור הקודם כבר לא תקף — יש לשלוח שוב.</div>';
+    }
+
+    var ids = (o.deals || []).map(function (x) { return x.deal_id; });
+    ids.forEach(function (id) { if (byId[id]) h += dealHtml(byId[id], viewer); });
+
+    h += '<div class="order-sum">' +
+      sumCell('רכבים', t.vehicles) + sumCell('אביזרים ושירותים', t.extras) + sumCell('סה״כ כולל מע״מ', t.grand, true) +
+      (t.trade_in ? sumCell('זיכוי טרייד-אין', -t.trade_in) : '') +
+      (t.down_payment ? sumCell('מקדמה', -t.down_payment) : '') +
+      (t.financing ? sumCell('מימון', -t.financing) : '') +
+      sumCell('יתרה לתשלום', t.balance, true) + '</div>';
+    if (t.count && !t.priced) h += '<div class="terms-note">לחלק מהרכבים עוד אין מחיר מכירה — הסכום חלקי.</div>';
+    if (o.pending_lines) h += '<div class="terms-note warn">' + o.pending_lines + ' שורות ממתינות לאישור מנהל — עד אז לא ניתן לשלוח את ההזמנה.</div>';
+
+    if (live) {
+      h += '<div class="order-acts">';
+      if (can('create_customer_deal')) h += '<button class="btn-icon order-add-veh" type="button">+ רכב נוסף להזמנה</button>';
+      if (o.can_send) {
+        h += '<button class="btn-icon primary order-send" type="button">' +
+          (['sent', 'approved', 'changed', 'change_requested'].indexOf(st.code) > -1 && o.sent_at ? 'שליחה מחדש ללקוח' : 'שליחה ללקוח לאישור') + '</button>';
+        if (st.code === 'sent') h += '<button class="btn-icon order-withdraw" type="button">החזרה להכנה</button>';
+      }
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
+
+  function sumCell(k, v, strong) {
+    var txt = v == null ? '—' : (v < 0 ? '−' + YM.nis(-v) : YM.nis(v));
+    return '<div' + (strong ? ' class="strong"' : '') + '><span class="k">' + E(k) + '</span><span class="v">' + E(txt) + '</span></div>';
+  }
+
+  var KIND_HE = { accessory: 'אביזר', service: 'שירות', custom: 'שורה חופשית' };
+  function cartHtml(d) {
+    var c = cartLookup(d.id);
+    if (!c) return '';
+    var lines = c.deal.lines || [], ed = c.deal.editable, appr = state.orders && state.orders.can_approve_lines;
+    var h = '<div class="cart" data-deal="' + E(d.id) + '"><div class="cl-head"><span>אביזרים ושירותים לרכב</span></div>';
+    if (!lines.length) h += '<div class="empty small">לא נוספו תוספות לרכב הזה.</div>';
+    lines.forEach(function (x) {
+      h += '<div class="cart-line st-' + E(x.status) + '" data-line="' + E(x.id) + '">' +
+        '<div class="cart-main"><div class="t">' + E(x.label) + ' <span class="kind">' + E(KIND_HE[x.kind] || '') + '</span></div>' +
+          '<div class="s">' + (x.quantity > 1 ? x.quantity + ' × ' + E(YM.nis(x.unit_price)) + ' · ' : '') +
+            (x.status === 'pending' ? 'ממתינה לאישור מנהל' + (x.by ? ' · נוספה ע"י ' + E(x.by) : '') :
+             x.status === 'rejected' ? 'נדחתה' + (x.decided_by ? ' ע"י ' + E(x.decided_by) : '') + (x.note ? ': ' + E(x.note) : '') :
+             (x.kind === 'custom' && x.decided_by ? 'אושרה ע"י ' + E(x.decided_by) : '')) + '</div></div>' +
+        '<div class="cart-price">' + E(YM.nis(x.total)) + '</div>' +
+        '<div class="cart-ctl">' +
+          (appr && x.status === 'pending' ? '<button class="btn-icon primary line-ok" type="button">אישור</button><button class="btn-icon line-no" type="button">דחייה</button>' : '') +
+          (ed && x.status !== 'rejected' ? '<button class="btn-icon line-qty" type="button" title="כמות">כמות</button>' : '') +
+          (ed ? '<button class="btn-icon danger line-del" type="button" title="הסרה">הסרה</button>' : '') +
+        '</div></div>';
+    });
+    if (ed) {
+      var cat = (state.orders && state.orders.catalog) || [];
+      h += '<div class="cart-add">' +
+        '<select class="small cart-pick" aria-label="בחירת פריט מהקטלוג"><option value="">הוספה מהקטלוג…</option>' +
+          ['accessory', 'service'].map(function (k) {
+            var items = cat.filter(function (i) { return i.kind === k; });
+            if (!items.length) return '';
+            return '<optgroup label="' + (k === 'accessory' ? 'אביזרים' : 'שירותים') + '">' + items.map(function (i) {
+              return '<option value="' + E(i.id) + '">' + E(i.name) + ' — ' + E(YM.nis(i.price)) + '</option>';
+            }).join('') + '</optgroup>';
+          }).join('') +
+        '</select>' +
+        '<input class="small cart-qty" type="number" min="1" max="99" value="1" aria-label="כמות">' +
+        '<button class="btn-icon cart-add-btn" type="button">הוספה</button>' +
+        '<button class="linkish cart-custom" type="button">שורה חופשית</button>' +
+        (!cat.length ? '<span class="hint">הקטלוג ריק — מנהל הרכש מוסיף פריטים ב"קטלוג תוספות".</span>' : '') +
+      '</div>';
+    } else if (c.deal.locked) {
+      h += '<div class="terms-note">ההסכם על הרכב נחתם — התוספות נעולות.</div>';
+    }
+    return h + '</div>';
+  }
+
+  async function orderCall(payload, okReload) {
+    payload.token = session.token;
+    var r;
+    try { r = await YM.api('/orders/action', payload); } catch (err) { r = { ok: false, message_he: err.message }; }
+    notice(r.message_he || (r.ok ? 'נשמר.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
+    if (r.ok && okReload !== false) openCard(state.cardId);
+    return r;
+  }
+
+  function bindOrders(res) {
+    var body = document.getElementById('card-body');
+    body.querySelectorAll('.order').forEach(function (el) {
+      var oid = el.getAttribute('data-order');
+      var o = ((state.orders && state.orders.orders) || []).filter(function (x) { return x.id === oid; })[0] || {};
+      var addVeh = el.querySelector('.order-add-veh');
+      if (addVeh) addVeh.addEventListener('click', function () { openDealForm(res.customer, null, oid); });
+      var send = el.querySelector('.order-send');
+      if (send) send.addEventListener('click', function () { openSend(o, res.customer); });
+      var wd = el.querySelector('.order-withdraw');
+      if (wd) wd.addEventListener('click', function () {
+        if (!confirm('להחזיר את ההזמנה להכנה? הלקוח לא יוכל לאשר אותה עד שתישלח שוב.')) return;
+        orderCall({ action: 'withdraw', order_id: oid });
+      });
+    });
+    body.querySelectorAll('.cart').forEach(function (el) {
+      var dealId = el.getAttribute('data-deal');
+      var addBtn = el.querySelector('.cart-add-btn');
+      if (addBtn) addBtn.addEventListener('click', function () {
+        var pick = el.querySelector('.cart-pick').value;
+        if (!pick) { notice('בחרו פריט מהקטלוג.', 'err'); return; }
+        addBtn.disabled = true;
+        orderCall({ action: 'extra_add', deal_id: dealId, catalog_item_id: pick, quantity: el.querySelector('.cart-qty').value || 1 });
+      });
+      var cust = el.querySelector('.cart-custom');
+      if (cust) cust.addEventListener('click', function () {
+        var label = prompt('תיאור השורה (למשל: התקנת וו גרירה מקורי):');
+        if (label === null || !label.trim()) return;
+        var price = prompt('מחיר כולל מע"מ (₪):');
+        if (price === null || !String(price).trim()) return;
+        orderCall({ action: 'extra_add', deal_id: dealId, label: label, unit_price: price, quantity: 1 });
+      });
+      el.querySelectorAll('.cart-line').forEach(function (row) {
+        var lid = row.getAttribute('data-line');
+        var q = row.querySelector('.line-qty');
+        if (q) q.addEventListener('click', function () {
+          var v = prompt('כמות:', '1'); if (v === null) return;
+          orderCall({ action: 'extra_qty', extra_id: lid, quantity: v });
+        });
+        var del = row.querySelector('.line-del');
+        if (del) del.addEventListener('click', function () {
+          if (!confirm('להסיר את השורה מההזמנה?')) return;
+          orderCall({ action: 'extra_remove', extra_id: lid });
+        });
+        var ok = row.querySelector('.line-ok');
+        if (ok) ok.addEventListener('click', function () { orderCall({ action: 'extra_decide', extra_id: lid, approve: true }); });
+        var no = row.querySelector('.line-no');
+        if (no) no.addEventListener('click', function () {
+          var why = prompt('סיבת הדחייה:'); if (why === null || !why.trim()) return;
+          orderCall({ action: 'extra_decide', extra_id: lid, approve: false, note: why });
+        });
+      });
+    });
+  }
+
+  /* שליחה ללקוח: ההזמנה נפתחת לאישור באיזור האישי; ההודעה יכולה לצאת במייל או בוואטסאפ */
+  var sendCtx = null;
+  function openSend(o, customer) {
+    sendCtx = o;
+    var t = (o.snapshot && o.snapshot.totals) || {};
+    document.getElementById('send-line').textContent = o.order_number + ' · ' + customer.name + ' · סה״כ ' + YM.nis(t.grand) + ' · יתרה ' + YM.nis(t.balance);
+    var em = document.getElementById('send-email');
+    em.disabled = !customer.invoice_email;
+    em.parentNode.title = customer.invoice_email ? customer.invoice_email : 'ללקוח אין מייל';
+    document.getElementById('send-email-note').textContent = customer.invoice_email ? 'יישלח ל-' + customer.invoice_email : 'ללקוח אין כתובת מייל — אפשר להוסיף בעריכת הפרטים.';
+    document.getElementById(customer.invoice_email ? 'send-email' : 'send-wa').checked = true;
+    hide('card-modal');
+    show('send-modal');
+  }
+  var sendForm = document.getElementById('send-form');
+  if (sendForm) sendForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (!sendCtx) return;
+    var ch = (sendForm.querySelector('input[name="channel"]:checked') || {}).value || 'portal';
+    var waWin = ch === 'whatsapp' ? window.open('', '_blank') : null; // נפתח עכשיו כדי שהדפדפן לא יחסום
+    var btn = document.getElementById('send-go'); btn.disabled = true;
+    var r = await orderCall({ action: 'send', order_id: sendCtx.id, channel: ch }, false);
+    btn.disabled = false;
+    if (r.ok && r.wa_phone && waWin) {
+      waWin.location = 'https://wa.me/' + String(r.wa_phone).replace(/\D/g, '') + '?text=' + encodeURIComponent(r.wa_text || '');
+    } else if (waWin) waWin.close();
+    if (r.ok) { hide('send-modal'); openCard(state.cardId); }
+  });
+
+  /* ---------- קטלוג אביזרים ושירותים (מנהל רכש) ---------- */
+  var catBtn = document.getElementById('open-catalog');
+  if (catBtn) {
+    catBtn.hidden = !can('manage_catalog');
+    catBtn.addEventListener('click', function () { show('catalog-modal'); loadCatalog(); });
+  }
+  async function loadCatalog() {
+    var host = document.getElementById('catalog-rows');
+    host.innerHTML = '<div class="empty small">טוען…</div>';
+    var r;
+    try { r = await YM.api('/orders/action', { token: session.token, action: 'catalog' }); } catch (err) { r = { ok: false, message_he: err.message }; }
+    if (r.ok !== true) { host.innerHTML = '<div class="empty small">' + E(r.message_he || 'הטעינה נכשלה.') + '</div>'; return; }
+    var items = r.items || [];
+    host.innerHTML = items.length ? items.map(function (i) {
+      return '<div class="cat-row' + (i.active ? '' : ' off') + '" data-id="' + E(i.id) + '">' +
+        '<div><div class="t">' + E(i.name) + ' <span class="kind">' + E(KIND_HE[i.kind]) + '</span>' + (i.active ? '' : ' <span class="kind">מושבת</span>') + '</div>' +
+        '<div class="s">' + (i.description ? E(i.description) + ' · ' : '') + 'בשימוש ב-' + i.used + ' הזמנות' + (i.updated_by ? ' · עודכן ע"י ' + E(i.updated_by) : '') + '</div></div>' +
+        '<div class="cart-price">' + E(YM.nis(i.price)) + '</div>' +
+        '<button class="btn-icon cat-edit" type="button">עריכה</button></div>';
+    }).join('') : '<div class="empty small">הקטלוג ריק. הוסיפו את האביזרים והשירותים שאתם מוכרים, עם המחיר ללקוח כולל מע"מ.</div>';
+    host.querySelectorAll('.cat-edit').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.closest('.cat-row').getAttribute('data-id');
+        fillCatForm(items.filter(function (x) { return x.id === id; })[0]);
+      });
+    });
+  }
+  var catForm = document.getElementById('catalog-form');
+  function fillCatForm(i) {
+    catForm.reset();
+    catForm.item_id.value = i ? i.id : '';
+    catForm.kind.value = i ? i.kind : 'accessory';
+    catForm.item_name.value = i ? i.name : '';
+    catForm.description.value = i ? (i.description || '') : '';
+    catForm.price.value = i ? i.price : '';
+    catForm.active.checked = i ? !!i.active : true;
+    document.getElementById('cat-save').textContent = i ? 'שמירת שינויים' : 'הוספה לקטלוג';
+    catForm.item_name.focus();
+  }
+  if (catForm) {
+    document.getElementById('cat-new').addEventListener('click', function () { fillCatForm(null); });
+    catForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var item = { id: catForm.item_id.value || null, kind: catForm.kind.value, name: catForm.item_name.value,
+                   description: catForm.description.value, price: catForm.price.value, active: catForm.active.checked };
+      var r = await orderCall({ action: 'catalog_save', item: item }, false);
+      if (r.ok) { fillCatForm(null); loadCatalog(); }
+    });
   }
 
   /* ---------- תנאים מסחריים והסכם מכירה ---------- */
@@ -619,6 +883,7 @@
         if (r.ok) openCard(state.cardId);
       });
     });
+    bindOrders(res);
   }
 
   /* ---------- טופס לקוח ---------- */
@@ -739,13 +1004,16 @@
   dForm.financing_required.addEventListener('change', syncDealHints);
   dForm.financing_on_private_name.addEventListener('change', syncDealHints);
 
-  function openDealForm(customer, deal) {
+  var dealOrderId = null;
+  function openDealForm(customer, deal, orderId) {
     dForm.reset();
     dealEditId = deal ? deal.id : null;
+    dealOrderId = deal ? null : (orderId || null);
     dForm.customer_id.value = customer.id;
-    document.getElementById('deal-modal-title').textContent = deal ? 'שיוך רכב לעסקה' : 'עסקה חדשה';
+    var ord = dealOrderId && ((state.orders && state.orders.orders) || []).filter(function (x) { return x.id === dealOrderId; })[0];
+    document.getElementById('deal-modal-title').textContent = deal ? 'שיוך רכב לעסקה' : (ord ? 'רכב נוסף להזמנה ' + ord.order_number : 'הזמנה חדשה');
     document.getElementById('deal-customer-line').textContent = 'לקוח: ' + customer.name + ' · ' + YM.phoneHe(customer.phone);
-    document.getElementById('deal-save').textContent = deal ? 'שמירה' : 'פתיחת עסקה';
+    document.getElementById('deal-save').textContent = deal ? 'שמירה' : (ord ? 'הוספה להזמנה' : 'פתיחת הזמנה');
     dealCustomer = customer;
     if (deal) {
       dForm.end_user_same_as_customer.checked = deal.end_user_same_as_customer !== false;
@@ -804,6 +1072,7 @@
       end_user_same_as_customer: dForm.end_user_same_as_customer.checked,
       end_user_name: dForm.end_user_name.value, end_user_phone: dForm.end_user_phone.value, end_user_id_number: dForm.end_user_id_number.value,
       vehicle_file_id: dForm.vehicle_file_id.value || null,
+      order_id: dealEditId ? null : dealOrderId,
       financing_required: dForm.financing_required.checked, financing_on_private_name: dForm.financing_on_private_name.checked,
       sale_price: dForm.sale_price.value ? Number(String(dForm.sale_price.value).replace(/[^\d.]/g, '')) : null
     };
@@ -811,7 +1080,7 @@
     var r;
     try { r = await YM.api('/deals/save', { token: session.token, deal: payload }); }
     catch (err) { r = { ok: false, message_he: err.message }; }
-    btn.disabled = false; btn.textContent = dealEditId ? 'שמירה' : 'פתיחת עסקה';
+    btn.disabled = false; btn.textContent = dealEditId ? 'שמירה' : (dealOrderId ? 'הוספה להזמנה' : 'פתיחת הזמנה');
     notice(r.message_he || (r.ok ? 'נשמר.' : 'השמירה נכשלה.'), r.ok ? 'ok' : 'err');
     if (r.ok) { hide('deal-modal'); await load(false); openCard(dForm.customer_id.value); }
   });

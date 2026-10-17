@@ -44,6 +44,7 @@
           <span class="glass"></span>
           <input id="search" type="search" placeholder="שם, טלפון, ת.ז. או ח.פ" aria-label="חיפוש לקוחות">
         </div>
+        <button class="btn-ghost" type="button" id="open-catalog" hidden>קטלוג תוספות</button>
         <button class="btn-primary" type="button" id="new-customer">לקוח חדש</button>
         <div class="avatar" id="avatar">—</div>
       </div>
@@ -222,6 +223,53 @@
     <div class="modal-actions">
       <button class="btn-ghost" type="button" data-close="apv-modal">סגירה</button>
     </div>
+  </div>
+</div>
+
+<!-- שליחת הזמנה ללקוח לאישור -->
+<div class="modal" id="send-modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <button class="modal-x" type="button" data-close="send-modal" aria-label="סגירה">×</button>
+    <h2>שליחת ההזמנה ללקוח לאישור</h2>
+    <form id="send-form" class="form" novalidate>
+      <div class="sub" id="send-line"></div>
+      <div class="field">
+        <label>איך להודיע ללקוח?</label>
+        <label class="check"><input type="radio" name="channel" value="email" id="send-email"> מייל עם פירוט ההזמנה וקישור לאיזור האישי</label>
+        <div class="hint" id="send-email-note"></div>
+        <label class="check"><input type="radio" name="channel" value="whatsapp" id="send-wa"> וואטסאפ — נפתחת הודעה מוכנה לשליחה מהטלפון שלך</label>
+        <label class="check"><input type="radio" name="channel" value="portal"> בלי הודעה — רק לפתוח את ההזמנה באיזור האישי</label>
+      </div>
+      <div class="hint">הלקוח רואה באיזור האישי בדיוק את מה שנשלח עכשיו ומאשר אותו. כל שינוי אחרי השליחה (מחיר, תוספת, רכב) מבטל את האפשרות לאשר עד שליחה מחדש. האישור אינו מחליף את הסכם המכירה.</div>
+      <div class="modal-actions">
+        <button class="btn-primary" type="submit" id="send-go">שליחה</button>
+        <button class="btn-ghost" type="button" data-close="send-modal">ביטול</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- קטלוג אביזרים ושירותים -->
+<div class="modal" id="catalog-modal" hidden>
+  <div class="modal-box wide" role="dialog" aria-modal="true">
+    <button class="modal-x" type="button" data-close="catalog-modal" aria-label="סגירה">×</button>
+    <h2>קטלוג אביזרים ושירותים</h2>
+    <div class="hint" style="margin-bottom:10px">אנשי המכירות מוסיפים להזמנות רק מהרשימה הזו, במחיר שנקבע כאן. מחיר שמשתנה חל על שורות חדשות בלבד — הזמנות קיימות לא משתנות. פריט שלא מוכרים יותר — להשבית, לא למחוק.</div>
+    <div id="catalog-rows"></div>
+    <form id="catalog-form" class="form cat-form" novalidate>
+      <input type="hidden" name="item_id">
+      <div class="grid2">
+        <div class="field"><label for="cat-name">שם הפריט</label><input id="cat-name" name="item_name" placeholder="למשל: כיסוי ארגז נגלל"></div>
+        <div class="field"><label for="cat-kind">סוג</label><select id="cat-kind" name="kind"><option value="accessory">אביזר</option><option value="service">שירות</option></select></div>
+        <div class="field"><label for="cat-price">מחיר ללקוח כולל מע"מ (₪)</label><input id="cat-price" name="price" inputmode="decimal" dir="ltr"></div>
+        <div class="field"><label for="cat-desc">תיאור קצר (לא חובה)</label><input id="cat-desc" name="description"></div>
+      </div>
+      <label class="check"><input type="checkbox" name="active" checked> פעיל — מופיע לאנשי המכירות</label>
+      <div class="modal-actions">
+        <button class="btn-primary" type="submit" id="cat-save">הוספה לקטלוג</button>
+        <button class="btn-ghost" type="button" id="cat-new">ניקוי הטופס</button>
+      </div>
+    </form>
   </div>
 </div>
 

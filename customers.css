@@ -281,3 +281,66 @@
 .pt-hist { margin-top: 12px; font-size: 12.5px; color: var(--text-faint); }
 .pt-hist summary { cursor: pointer; }
 .pt-hist .timeline { margin-top: 8px; }
+/* ---------- הזמנה (עגלה) ---------- */
+.order {
+  border: 1px solid var(--border); border-radius: 10px; padding: 14px 14px 12px; margin-bottom: 14px;
+  background: rgba(255,255,255,.015); display: flex; flex-direction: column; gap: 10px;
+}
+.order-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.order-no { font-family: 'Cinzel', serif; font-size: 16px; letter-spacing: .04em; color: var(--text); direction: ltr; text-align: right; }
+.order-sub { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+.order-state { font-size: 11.5px; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border-chip); color: var(--text-mid); white-space: nowrap; }
+.order-state.st-draft { color: var(--text-faint); }
+.order-state.st-sent { border-color: rgba(120,160,255,.45); color: #9db7ff; }
+.order-state.st-approved, .order-state.st-closed { border-color: rgba(127,192,138,.45); color: var(--ok); }
+.order-state.st-change_requested, .order-state.st-changed { border-color: rgba(226,180,87,.5); color: var(--warn); }
+.order-state.st-cancelled { color: var(--text-fainter); }
+.order-alert {
+  border: 1px solid rgba(226,180,87,.45); background: rgba(226,180,87,.06); border-radius: 6px;
+  padding: 9px 12px; font-size: 13px; color: var(--text-body); white-space: pre-wrap;
+}
+.order-alert .s { display: block; font-size: 12px; color: var(--text-faint); margin-top: 3px; }
+.order .deal { margin-bottom: 0; }
+.order-sum {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px 14px;
+  border-top: 1px solid var(--border-soft); padding-top: 10px;
+}
+.order-sum > div { display: flex; flex-direction: column; gap: 2px; }
+.order-sum .k { font-size: 11px; color: var(--text-fainter); }
+.order-sum .v { font-size: 13.5px; color: var(--text-body); font-variant-numeric: tabular-nums; direction: ltr; text-align: right; }
+.order-sum .strong .v { color: var(--text); font-weight: 600; font-size: 15px; }
+.order-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.terms-note.warn { color: var(--warn); }
+
+.cart { border-top: 1px dashed var(--border-soft); margin-top: 10px; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.cart-line, .cat-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid var(--border-soft);
+}
+.cart-line:last-of-type { border-bottom: 0; }
+.cart-line .t, .cat-row .t { font-size: 13.5px; color: var(--text-body); }
+.cart-line .s, .cat-row .s { font-size: 11.5px; color: var(--text-faint); }
+.cart-line .kind, .cat-row .kind { font-size: 10.5px; color: var(--text-fainter); border: 1px solid var(--border-chip); border-radius: 4px; padding: 0 5px; margin-inline-start: 4px; }
+.cart-line.st-pending .t { color: var(--warn); }
+.cart-line.st-rejected { opacity: .55; }
+.cart-line.st-rejected .cart-price { text-decoration: line-through; }
+.cart-price { font-size: 13.5px; color: var(--text); font-variant-numeric: tabular-nums; direction: ltr; white-space: nowrap; }
+.cart-ctl { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.cart-add { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cart-add select.small, .cart-add input.small {
+  height: 32px; font-size: 12.5px; padding: 0 8px; background: #101216; color: var(--text-body);
+  border: 1px solid var(--border-input); border-radius: 6px;
+}
+.cart-add select.small { min-width: 220px; max-width: 100%; }
+.cart-add input.small { width: 64px; direction: ltr; }
+.cat-row.off { opacity: .5; }
+.cat-row { grid-template-columns: 1fr auto auto; }
+.cat-form { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; }
+.form input[type="radio"] { width: 16px; height: 16px; accent-color: var(--accent); }
+
+@media (max-width: 760px) {
+  .cart-line { grid-template-columns: 1fr auto; }
+  .cart-line .cart-ctl { grid-column: 1 / -1; justify-content: flex-start; }
+  .cart-add select.small { min-width: 0; flex: 1 1 100%; }
+  .order { padding: 12px 10px; }
+}
