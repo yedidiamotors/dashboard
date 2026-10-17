@@ -150,6 +150,12 @@
     });
   }
 
+  var LEAD_SOURCES = { website_form: ['אתר', 'web'], facebook_lead_ad: ['פייסבוק', 'fb'] };
+  function leadSourceBadge(l) {
+    var src = LEAD_SOURCES[l.source] || [l.source || 'אתר', 'web'];
+    return '<span class="lead-src ' + src[1] + '">' + E(src[0]) + '</span>';
+  }
+
   function renderLeads() {
     var host = document.getElementById('lead-rows');
     if (!leads.rows.length) {
@@ -165,8 +171,10 @@
           (l.message ? '<div class="l-msg">' + E(String(l.message).slice(0, 160)) + '</div>' : '') +
           (l.customer_name ? '<div class="l-sub">לקוח: ' + E(l.customer_name) + '</div>' : (Number(l.matching_customers) ? '<div class="l-sub">יש כבר לקוח עם הטלפון הזה</div>' : '')) +
           (l.notes ? '<div class="l-sub">הערה: ' + E(l.notes) + '</div>' : '') + '</div>' +
-        '<div class="ltr l-phone">' + E(YM.phoneHe(l.phone)) + '</div>' +
-        '<div class="l-int">' + E(interest || '—') + (l.source ? '<div class="l-sub">' + E(l.source) + '</div>' : '') + '</div>' +
+        '<div class="ltr l-phone">' + E(l.phone ? YM.phoneHe(l.phone) : '—') + (l.email ? '<div class="l-sub">' + E(l.email) + '</div>' : '') + '</div>' +
+        '<div class="l-int">' + leadSourceBadge(l) + '<div>' + E(interest || '—') + '</div>' +
+          (l.form_name ? '<div class="l-sub">טופס: ' + E(l.form_name) + '</div>' : '') +
+          (l.campaign_name ? '<div class="l-sub">קמפיין: ' + E(l.campaign_name) + '</div>' : '') + '</div>' +
         '<div class="l-when">' + E(fmtDT(l.created_at)) + (l.handled_by_name ? '<div class="l-sub">טופל: ' + E(l.handled_by_name) + '</div>' : '') + '</div>' +
         '<div><span class="lead-status ' + E(l.status) + '">' + E(l.status_he) + '</span></div>' +
         '<div class="l-act">' +

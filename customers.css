@@ -421,3 +421,8 @@
   .idchk-row .k { grid-column: 2; }
   .idchk-row .v, .idchk-row .t { grid-column: 2; }
 }
+
+/* מקור ליד — אתר / פייסבוק */
+.lead-src { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-bottom: 3px; }
+.lead-src.web { background: rgba(201,162,39,.16); color: #8a6d12; }
+.lead-src.fb  { background: rgba(24,119,242,.14); color: #1877F2; }
