@@ -303,6 +303,8 @@
       (lc.can_delete && lc.can_delete_perm ? '<button class="btn-ghost small danger" type="button" id="card-delete">מחיקת לקוח</button>' : '') +
       '</div>';
 
+    h += '<div id="idchk-sect">' + idChecksHtml(res.id_checks || []) + '</div>';
+
     var orders = state.orders && state.orders.orders;
     if (orders) {
       // כל הזמנה מקבצת את הרכבים (העסקאות) שלה, עם עגלת התוספות והסיכום
@@ -859,7 +861,117 @@
     document.getElementById('apv-body').scrollTop = 0;
   }
 
+  /* ---------- בדיקת תעודות מזהות (OCR מול הכרטיס) ---------- */
+  var FIELD_HE = { id: 'מספר זהות', name: 'שם', address: 'כתובת' };
+  function idChecksHtml(list) {
+    if (!list.length) return '';
+    var open = list.filter(function (k) { return !k.resolved && (k.status === 'mismatch' || k.status === 'unreadable' || k.status === 'error'); });
+    var h = '<div class="sect idchk"><h3>בדיקת תעודות מזהות' + (open.length ? ' <span class="idchk-count">' + open.length + ' לטיפול</span>' : '') + '</h3>';
+    list.forEach(function (k) {
+      var x = k.extracted || {};
+      var who = [x.full_name_he || x.company_name || x.full_name_en, x.id_number || x.company_reg_number].filter(Boolean).join(' · ');
+      var head = '<div class="idchk-head"><b>' + E(k.kind_he) + '</b>' + (who ? ' · <span>' + E(who) + '</span>' : '') +
+        (k.vehicle ? ' <span class="idchk-veh">' + E(k.vehicle) + '</span>' : '') +
+        '<span class="idchk-when">' + fmtDT(k.checked_at || k.created_at) + '</span></div>';
+      if (k.status === 'pending') {
+        h += '<div class="idchk-item pending">' + head + '<div class="idchk-line">סורקים את התעודה ומשווים לכרטיס…</div></div>';
+        return;
+      }
+      if (k.status === 'match') {
+        h += '<div class="idchk-item ok">' + head + '<div class="idchk-line">✓ הפרטים בתעודה תואמים ל' + E(k.party_label || 'כרטיס') + '.' +
+          (x.expiry_date ? ' בתוקף עד ' + E(x.expiry_date.split('-').reverse().join('.')) + '.' : '') + '</div>' +
+          flagsHtml(k.flags) + '</div>';
+        return;
+      }
+      if (k.resolved) {
+        h += '<div class="idchk-item done">' + head + '<div class="idchk-line">' +
+          (k.resolution === 'applied' ? 'הפרטים עודכנו מהתעודה (' + E(((k.applied && k.applied.fields) || []).map(function (f) { return FIELD_HE[f] || f; }).join(', ')) + ')'
+                                       : 'נבדק — הפרטים בכרטיס נשארו כמו שהם') +
+          (k.resolved_by ? ' · ' + E(k.resolved_by) : '') + ' · ' + fmtDT(k.resolved_at) + '</div></div>';
+        return;
+      }
+      var mis = k.mismatches || [];
+      var rows = mis.map(function (m) {
+        var canApply = m.doc && (m.field !== 'id' || /^\d{5,9}$/.test(String(m.doc)));
+        return '<label class="idchk-row sev-' + E(m.severity) + '">' +
+          (canApply ? '<input type="checkbox" class="idchk-f" value="' + E(m.field) + '"' + (m.card ? '' : ' checked') + '>' : '<span class="idchk-nochk"></span>') +
+          '<span class="k">' + E(m.label) + '</span>' +
+          '<span class="v">בתעודה: <b>' + E(m.doc || '—') + '</b></span>' +
+          '<span class="v">בכרטיס: <b>' + E(m.card || 'חסר') + '</b></span>' +
+          '<span class="t">' + E(m.text || '') + '</span></label>';
+      }).join('');
+      var targets = k.targets || [];
+      var tsel = targets.length > 1 ? '<select class="small idchk-target" aria-label="לאן לעדכן">' + targets.map(function (t) {
+        return '<option value="' + E(t.key) + '"' + (t.key === k.party ? ' selected' : '') + '>לעדכן ב: ' + E(t.label) + '</option>';
+      }).join('') + '</select>' : '';
+      h += '<div class="idchk-item warn" data-check="' + E(k.id) + '">' + head +
+        (k.status === 'unreadable' || k.status === 'error'
+          ? '<div class="idchk-line">⚠ ' + E(k.status === 'error' ? ('הסריקה נכשלה' + (k.error ? ': ' + k.error : '')) : 'לא הצלחנו לקרוא את פרטי התעודה.') + ' כדאי לבדוק את הקובץ ידנית.</div>'
+          : '<div class="idchk-line">⚠ יש אי-התאמה בין התעודה ל' + E(k.party_label || 'כרטיס') + '. זה לא חוסם — רק לוודא שזה תקין (למשל תעודה של בן/בת הזוג).</div>') +
+        (rows ? '<div class="idchk-rows">' + rows + '</div>' : '') + flagsHtml(k.flags) +
+        '<div class="idchk-acts">' + tsel +
+          (rows && mis.some(function (m) { return m.doc; }) ? '<button class="btn-icon primary idchk-apply" type="button">עדכון הפרטים שסומנו לכרטיס</button>' : '') +
+          '<button class="btn-icon idchk-ignore" type="button">הפרטים בכרטיס נכונים</button></div></div>';
+    });
+    return h + '</div>';
+  }
+  function flagsHtml(flags) {
+    if (!flags || !flags.length) return '';
+    return '<ul class="idchk-flags">' + flags.map(function (f) { return '<li class="sev-' + E(f.severity) + '">' + E(f.text) + '</li>'; }).join('') + '</ul>';
+  }
+  function bindIdChecks() {
+    var sect = document.getElementById('idchk-sect');
+    if (!sect) return;
+    sect.querySelectorAll('.idchk-item.warn').forEach(function (el) {
+      var id = el.getAttribute('data-check');
+      var ap = el.querySelector('.idchk-apply');
+      if (ap) ap.addEventListener('click', async function () {
+        var fields = Array.prototype.map.call(el.querySelectorAll('.idchk-f:checked'), function (c) { return c.value; });
+        if (!fields.length) { notice('סמנו אילו פרטים לעדכן מהתעודה.', 'err'); return; }
+        var tg = el.querySelector('.idchk-target');
+        ap.disabled = true;
+        await idCheckCall({ check_id: id, action: 'apply', fields: fields, target: tg ? tg.value : 'customer' }, true);
+        ap.disabled = false;
+      });
+      var ig = el.querySelector('.idchk-ignore');
+      if (ig) ig.addEventListener('click', function () { idCheckCall({ check_id: id, action: 'ignore' }, false); });
+    });
+  }
+  async function idCheckCall(payload, reloadAll) {
+    payload.token = session.token;
+    var r;
+    try { r = await YM.api('/id-check/resolve', payload); } catch (err) { r = { ok: false, message_he: err.message }; }
+    notice(r.message_he || (r.ok ? 'נשמר.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
+    if (r.ok) { if (reloadAll) { openCard(state.cardId); load(false); } else refreshIdChecks(); }
+  }
+  async function refreshIdChecks() {
+    var id = state.cardId, sect = document.getElementById('idchk-sect');
+    if (!id || !sect || document.getElementById('card-modal').hidden) return null;
+    var r; try { r = await YM.api('/customers/card', { token: session.token, id: id }); } catch (e) { return null; }
+    if (!r || r.ok !== true || state.cardId !== id) return null;
+    sect = document.getElementById('idchk-sect');
+    if (!sect) return null;
+    sect.innerHTML = idChecksHtml(r.id_checks || []);
+    bindIdChecks();
+    return r.id_checks || [];
+  }
+  // אחרי העלאת תעודה: הסריקה רצה ברקע — מרעננים את הבדיקות עד שהתוצאה מגיעה
+  function watchIdChecks(customerId, known) {
+    var tries = 0;
+    (function tick() {
+      setTimeout(async function () {
+        if (state.cardId !== customerId) return;
+        var list = await refreshIdChecks();
+        tries++;
+        var fresh = (list || []).filter(function (k) { return known.indexOf(k.id) === -1; });
+        var pending = !fresh.length || fresh.some(function (k) { return k.status === 'pending'; });
+        if (pending && tries < 8) tick();
+      }, tries ? 5000 : 4000);
+    })();
+  }
+
   function bindCard(res) {
+    bindIdChecks();
     var body = document.getElementById('card-body');
     var cdocUp = document.getElementById('cdoc-up');
     if (cdocUp) cdocUp.addEventListener('click', function () {
@@ -1629,7 +1741,14 @@
       r = await resp.json().catch(function () { return { ok: false, message_he: 'תשובה לא תקינה מהשרת.' }; });
     } catch (err) { r = { ok: false, message_he: 'אין תקשורת עם השרת.' }; }
     notice(r.message_he || (r.ok ? 'הועלה.' : 'ההעלאה נכשלה.'), r.ok ? 'ok' : 'err');
-    if (r.ok) { openCard(state.cardId); load(false); }
+    if (r.ok) {
+      var knownChecks = ((state.card && state.card.id_checks) || []).map(function (k) { return k.id; });
+      openCard(state.cardId); load(false);
+      if (['id_card', 'drivers_license', 'company_registration'].indexOf(pendingUpload.doc_type) > -1) {
+        notice('התעודה הועלתה. סורקים אותה ומשווים לכרטיס — התוצאה תופיע בעוד כמה שניות.', 'ok');
+        watchIdChecks(state.cardId, knownChecks);
+      }
+    }
     pendingUpload = null;
   });
 

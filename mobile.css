@@ -84,6 +84,6 @@
 }
 
 /* תפריטי בחירה קטנים בכרטיס העסקה — כהים כמו שאר השדות (היו לבנים) */
-.deal select.small, .actions select.small, .owner-line select.small {
+.deal select.small, .actions select.small, .owner-line select.small, .idchk-acts select.small {
   background: #101216; color: var(--text-body); border: 1px solid var(--border-input); border-radius: 6px;
 }
