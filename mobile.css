@@ -87,3 +87,10 @@
 .deal select.small, .actions select.small, .owner-line select.small, .idchk-acts select.small {
   background: #101216; color: var(--text-body); border: 1px solid var(--border-input); border-radius: 6px;
 }
+
+/* חלון שאלה קצר — נשאר חלון מרוכז גם בטלפון */
+@media (max-width: 760px) {
+  .modal.ui-dialog { padding: 16px; align-items: center; }
+  .modal.ui-dialog .modal-box { min-height: 0; height: auto; border-radius: 12px; border: 1px solid var(--border); padding: 20px 18px; max-width: 460px !important; }
+}
+.modal.ui-dialog { align-items: center; }

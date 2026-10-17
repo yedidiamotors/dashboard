@@ -27,6 +27,36 @@
   var leads = { rows: [], counts: {}, filter: '', loaded: false };
   var DEAL_STATUSES = [['open', 'פתוחה'], ['pending_signatures', 'ממתינה לחתימות'], ['completed', 'הושלמה'], ['cancelled', 'בוטלה']];
 
+  /* ---------- חלון שאלה/אישור בתוך הדף (במקום prompt/confirm של הדפדפן, שנחסמים בחלק מהטלפונים) ---------- */
+  function uiDialog(opts) {
+    return new Promise(function (resolve) {
+      var wrap = document.createElement('div');
+      wrap.className = 'modal ui-dialog';
+      wrap.innerHTML = '<div class="modal-box" role="dialog" aria-modal="true">' +
+        '<div class="ui-dialog-text"></div>' +
+        (opts.input ? '<textarea class="ui-dialog-input" rows="2"></textarea>' : '') +
+        '<div class="modal-actions"><button class="' + (opts.danger ? 'btn-primary danger' : 'btn-primary') + ' ui-ok" type="button"></button>' +
+        '<button class="btn-ghost ui-cancel" type="button">ביטול</button></div></div>';
+      wrap.querySelector('.ui-dialog-text').textContent = opts.text || '';
+      wrap.querySelector('.ui-ok').textContent = opts.okLabel || 'אישור';
+      var inp = wrap.querySelector('.ui-dialog-input');
+      if (inp) inp.value = opts.value == null ? '' : String(opts.value);
+      document.body.appendChild(wrap);
+      var done = function (v) { document.removeEventListener('keydown', onKey, true); wrap.remove(); resolve(v); };
+      var onKey = function (e) {
+        if (e.key === 'Escape') { e.stopPropagation(); done(opts.input ? null : false); }
+        else if (e.key === 'Enter' && !e.shiftKey && (!inp || document.activeElement === inp)) { e.preventDefault(); done(inp ? inp.value : true); }
+      };
+      document.addEventListener('keydown', onKey, true);
+      wrap.querySelector('.ui-ok').addEventListener('click', function () { done(inp ? inp.value : true); });
+      wrap.querySelector('.ui-cancel').addEventListener('click', function () { done(opts.input ? null : false); });
+      wrap.addEventListener('click', function (e) { if (e.target === wrap) done(opts.input ? null : false); });
+      setTimeout(function () { (inp || wrap.querySelector('.ui-ok')).focus(); }, 30);
+    });
+  }
+  function uiPrompt(text, value, okLabel) { return uiDialog({ text: text, input: true, value: value, okLabel: okLabel }); }
+  function uiConfirm(text, okLabel, danger) { return uiDialog({ text: text, okLabel: okLabel, danger: danger }); }
+
   load(true);
 
   /* ---------- רשימה ---------- */
@@ -202,8 +232,8 @@
       var sel = row.querySelector('.lead-status-sel');
       if (sel) sel.addEventListener('change', function () { updateLead({ lead_id: id, status: sel.value }); });
       var nb = row.querySelector('.lead-note');
-      if (nb) nb.addEventListener('click', function () {
-        var txt = prompt('הערה לליד:', lead.notes || '');
+      if (nb) nb.addEventListener('click', async function () {
+        var txt = await uiPrompt('הערה לליד:', lead.notes || '');
         if (txt === null) return;
         updateLead({ lead_id: id, notes: txt });
       });
@@ -308,7 +338,7 @@
       '<button class="btn-ghost small" type="button" id="card-edit">עריכת פרטים</button>' +
       (lc.archived ? '<button class="btn-ghost small" type="button" id="card-unarchive">שחזור מהארכיון</button>'
                    : '<button class="btn-ghost small" type="button" id="card-archive"' + (lc.can_archive ? '' : ' data-blocked="1" title="' + E(lc.archive_message_he || '') + '"') + '>העברה לארכיון</button>') +
-      (lc.can_delete && lc.can_delete_perm ? '<button class="btn-ghost small danger" type="button" id="card-delete">מחיקת לקוח</button>' : '') +
+      (lc.can_delete_perm ? '<button class="btn-ghost small danger" type="button" id="card-delete"' + (lc.can_delete ? '' : ' data-blocked="1" title="' + E(lc.delete_message_he || '') + '"') + '>מחיקת לקוח</button>' : '') +
       '</div>';
 
     h += '<div id="idchk-sect">' + idChecksHtml(res.id_checks || []) + '</div>';
@@ -593,10 +623,10 @@
       var send = el.querySelector('.order-send');
       if (send) send.addEventListener('click', function () { openSend(o, res.customer); });
       var arc = el.querySelector('.order-archive');
-      if (arc) arc.addEventListener('click', function () {
+      if (arc) arc.addEventListener('click', async function () {
         var ac = o.archive_check || {};
         var what = ac.kind === 'delivered' ? 'כל הרכבים בהזמנה נמסרו.' : ac.kind === 'partial' ? 'חלק מהרכבים נמסרו וחלק בוטלו.' : 'ההזמנה בוטלה / לא הושלמה.';
-        var reason = prompt(what + ' להעביר את ' + (o.order_number || 'ההזמנה') + ' לארכיון?\nסיבה / הערה (לא חובה):', '');
+        var reason = await uiPrompt(what + ' להעביר את ' + (o.order_number || 'ההזמנה') + ' לארכיון?\nסיבה / הערה (לא חובה):', '');
         if (reason === null) return;
         archiveCall({ action: 'order_archive', order_id: oid, reason: reason }, 'ההזמנה הועברה לארכיון.');
       });
@@ -610,8 +640,8 @@
         tg.textContent = open ? 'הסתרת פרטים' : 'הצגת פרטים';
       });
       var wd = el.querySelector('.order-withdraw');
-      if (wd) wd.addEventListener('click', function () {
-        if (!confirm('להחזיר את ההזמנה להכנה? הלקוח לא יוכל לאשר אותה עד שתישלח שוב.')) return;
+      if (wd) wd.addEventListener('click', async function () {
+        if (!await uiConfirm('להחזיר את ההזמנה להכנה? הלקוח לא יוכל לאשר אותה עד שתישלח שוב.')) return;
         orderCall({ action: 'withdraw', order_id: oid });
       });
     });
@@ -625,30 +655,30 @@
         orderCall({ action: 'extra_add', deal_id: dealId, catalog_item_id: pick, quantity: el.querySelector('.cart-qty').value || 1 });
       });
       var cust = el.querySelector('.cart-custom');
-      if (cust) cust.addEventListener('click', function () {
-        var label = prompt('תיאור השורה (למשל: התקנת וו גרירה מקורי):');
+      if (cust) cust.addEventListener('click', async function () {
+        var label = await uiPrompt('תיאור השורה (למשל: התקנת וו גרירה מקורי):');
         if (label === null || !label.trim()) return;
-        var price = prompt('מחיר כולל מע"מ (₪):');
+        var price = await uiPrompt('מחיר כולל מע"מ (₪):');
         if (price === null || !String(price).trim()) return;
         orderCall({ action: 'extra_add', deal_id: dealId, label: label, unit_price: price, quantity: 1 });
       });
       el.querySelectorAll('.cart-line').forEach(function (row) {
         var lid = row.getAttribute('data-line');
         var q = row.querySelector('.line-qty');
-        if (q) q.addEventListener('click', function () {
-          var v = prompt('כמות:', '1'); if (v === null) return;
+        if (q) q.addEventListener('click', async function () {
+          var v = await uiPrompt('כמות:', '1'); if (v === null) return;
           orderCall({ action: 'extra_qty', extra_id: lid, quantity: v });
         });
         var del = row.querySelector('.line-del');
-        if (del) del.addEventListener('click', function () {
-          if (!confirm('להסיר את השורה מההזמנה?')) return;
+        if (del) del.addEventListener('click', async function () {
+          if (!await uiConfirm('להסיר את השורה מההזמנה?')) return;
           orderCall({ action: 'extra_remove', extra_id: lid });
         });
         var ok = row.querySelector('.line-ok');
         if (ok) ok.addEventListener('click', function () { orderCall({ action: 'extra_decide', extra_id: lid, approve: true }); });
         var no = row.querySelector('.line-no');
-        if (no) no.addEventListener('click', function () {
-          var why = prompt('סיבת הדחייה:'); if (why === null || !why.trim()) return;
+        if (no) no.addEventListener('click', async function () {
+          var why = await uiPrompt('סיבת הדחייה:'); if (why === null || !why.trim()) return;
           orderCall({ action: 'extra_decide', extra_id: lid, approve: false, note: why });
         });
       });
@@ -847,7 +877,7 @@
     var list = (t0.terms || {}).list_price;
     var want = Number(String(terms.sale_price).replace(/[^0-9.]/g, ''));
     if (list != null && want && want < list) {
-      var why = prompt('הנחה של ' + YM.nis(list - want) + ' — מה הסיבה?',
+      var why = await uiPrompt('הנחה של ' + YM.nis(list - want) + ' — מה הסיבה?',
                        (t0.terms || {}).discount_reason || '');
       if (why === null || !String(why).trim()) { notice('הנחה מחייבת סיבה.', 'err'); return; }
       terms.discount_reason = why;
@@ -990,9 +1020,9 @@
     var edit = document.getElementById('card-edit');
     if (edit) edit.addEventListener('click', function () { openCustomerForm(res.customer); });
     var cArc = document.getElementById('card-archive');
-    if (cArc) cArc.addEventListener('click', function () {
+    if (cArc) cArc.addEventListener('click', async function () {
       if (cArc.getAttribute('data-blocked')) { notice(cArc.getAttribute('title') || 'אי אפשר להעביר לארכיון כרגע.', 'err'); return; }
-      var reason = prompt('להעביר את ' + res.customer.name + ' לארכיון?\nההזמנות שלו יעברו איתו. הלקוח עדיין יימצא בחיפוש.\nסיבה / הערה (לא חובה):', '');
+      var reason = await uiPrompt('להעביר את ' + res.customer.name + ' לארכיון?\nההזמנות שלו יעברו איתו. הלקוח עדיין יימצא בחיפוש.\nסיבה / הערה (לא חובה):', '', 'העברה לארכיון');
       if (reason === null) return;
       archiveCall({ action: 'customer_archive', customer_id: res.customer.id, reason: reason }, 'הלקוח הועבר לארכיון.');
     });
@@ -1001,8 +1031,9 @@
       archiveCall({ action: 'customer_unarchive', customer_id: res.customer.id }, 'הלקוח הוחזר לפעילים.');
     });
     var cDel = document.getElementById('card-delete');
-    if (cDel) cDel.addEventListener('click', function () {
-      var typed = prompt('מחיקה סופית של ' + res.customer.name + ' — הפרטים יימחקו ולא יהיה אפשר לשחזר.\nלאישור הקלידו: מחק');
+    if (cDel) cDel.addEventListener('click', async function () {
+      if (cDel.getAttribute('data-blocked')) { notice(cDel.getAttribute('title') || 'אי אפשר למחוק את הלקוח.', 'err'); return; }
+      var typed = await uiPrompt('מחיקה סופית של ' + res.customer.name + ' — הפרטים שלו יימחקו ולא יהיה אפשר לשחזר.' + (((res.customer.lifecycle || {}).delete_note_he) ? '\n' + res.customer.lifecycle.delete_note_he : '') + '\nלאישור הקלידו: מחק', '', 'מחיקה');
       if (typed === null) return;
       if (typed.trim() !== 'מחק') { notice('המחיקה לא בוצעה — לא הוקלד "מחק".', 'err'); return; }
       archiveCall({ action: 'customer_delete', customer_id: res.customer.id }, 'הלקוח נמחק.', function () { hide('card-modal'); });
@@ -1020,7 +1051,7 @@
       var sel = el.querySelector('.deal-status-sel');
       if (sel) sel.addEventListener('change', async function () {
         var st = sel.value;
-        if ((st === 'cancelled' || st === 'completed') && !confirm(st === 'cancelled' ? 'לבטל את העסקה? הרכב ישוחרר חזרה למלאי.' : 'לסמן את העסקה כהושלמה? הרכב יסומן כנמסר.')) { openCard(state.cardId); return; }
+        if ((st === 'cancelled' || st === 'completed') && !await uiConfirm(st === 'cancelled' ? 'לבטל את העסקה? הרכב ישוחרר חזרה למלאי.' : 'לסמן את העסקה כהושלמה? הרכב יסומן כנמסר.')) { openCard(state.cardId); return; }
         sel.disabled = true;
         var r = await YM.api('/deals/status', { token: session.token, deal_id: id, status: st });
         notice(r.message_he || (r.ok ? 'עודכן.' : 'העדכון נכשל.'), r.ok ? 'ok' : 'err');
@@ -1028,9 +1059,9 @@
       });
       var ask = el.querySelector('.disc-ask');
       if (ask) ask.addEventListener('click', async function () {
-        var amt = prompt('איזו הנחה לבקש? (₪)');
+        var amt = await uiPrompt('איזו הנחה לבקש? (₪)');
         if (amt === null || !String(amt).trim()) return;
-        var why = prompt('נימוק לבקשה:');
+        var why = await uiPrompt('נימוק לבקשה:');
         if (why === null || !String(why).trim()) return;
         var r = await YM.api('/deal/discount/request', { token: session.token, deal_id: id, amount: amt, reason: why });
         notice(r.message_he || (r.ok ? 'נשלח.' : 'הבקשה נכשלה.'), r.ok ? 'ok' : 'err');
@@ -1038,14 +1069,14 @@
       });
       var dOk = el.querySelector('.disc-ok');
       if (dOk) dOk.addEventListener('click', async function () {
-        var note = prompt('הערה לאישור (לא חובה):') || '';
+        var note = await uiPrompt('הערה לאישור (לא חובה):') || '';
         var r = await YM.api('/deal/discount/decide', { token: session.token, deal_id: id, approve: true, note: note });
         notice(r.message_he || (r.ok ? 'אושר.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
         if (r.ok) openCard(state.cardId);
       });
       var dNo = el.querySelector('.disc-no');
       if (dNo) dNo.addEventListener('click', async function () {
-        var note = prompt('סיבת הדחייה:');
+        var note = await uiPrompt('סיבת הדחייה:');
         if (note === null) return;
         var r = await YM.api('/deal/discount/decide', { token: session.token, deal_id: id, approve: false, note: note });
         notice(r.message_he || (r.ok ? 'נדחה.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
@@ -1107,7 +1138,7 @@
       el.querySelectorAll('.agr-issue').forEach(function (b) {
         b.addEventListener('click', async function () {
           if (dl.agreement && dl.agreement.status === 'signed' &&
-              !confirm('ההסכם הקיים כבר נחתם. הנפקת הסכם מתוקן לא מבטלת אותו — היא יוצרת גרסה חדשה לחתימה. להמשיך?')) return;
+              !await uiConfirm('ההסכם הקיים כבר נחתם. הנפקת הסכם מתוקן לא מבטלת אותו — היא יוצרת גרסה חדשה לחתימה. להמשיך?')) return;
           b.disabled = true;
           var r = await YM.api('/deal/agreement/issue', { token: session.token, deal_id: id });
           if (r.ok !== true && r.gaps && r.gaps.length) {
@@ -1122,7 +1153,7 @@
 
       var acl = el.querySelector('.agr-cancel');
       if (acl) acl.addEventListener('click', async function () {
-        var reason = prompt('סיבת ביטול ההסכם:');
+        var reason = await uiPrompt('סיבת ביטול ההסכם:');
         if (reason === null || !reason.trim()) return;
         var r = await YM.api('/deal/agreement/cancel', { token: session.token, agreement_id: dl.agreement.id, reason: reason });
         notice(r.message_he || (r.ok ? 'ההסכם בוטל.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
@@ -1427,8 +1458,8 @@
       var sel = row.querySelector('.cl-status');
       if (sel) sel.addEventListener('change', function () { setRequirement(dealId, body, editable, { requirement_id: rid, status: sel.value }); });
       var nb = row.querySelector('.cl-note');
-      if (nb) nb.addEventListener('click', function () {
-        var cur = row.querySelector('.cl-notes'); var txt = prompt('הערה לדרישה:', cur ? cur.textContent : '');
+      if (nb) nb.addEventListener('click', async function () {
+        var cur = row.querySelector('.cl-notes'); var txt = await uiPrompt('הערה לדרישה:', cur ? cur.textContent : '');
         if (txt === null) return;
         setRequirement(dealId, body, editable, { requirement_id: rid, notes: txt });
       });
@@ -1689,16 +1720,16 @@
             if (w) w.location.href = url; else location.href = url;
           } else if (w) w.close();
         } else if (act === 'invite-email') {
-          if (!confirm('לשלוח ללקוח מייל עם הקישור לאיזור האישי?')) return;
+          if (!await uiConfirm('לשלוח ללקוח מייל עם הקישור לאיזור האישי?')) return;
           res = await portalAction({ action: 'invite', channel: 'email' }, b);
         } else if (act === 'copy') {
-          try { await navigator.clipboard.writeText(r.portal_url); portalMsg('הקישור הועתק.', 'ok'); } catch (e) { prompt('העתיקו את הקישור:', r.portal_url); }
+          try { await navigator.clipboard.writeText(r.portal_url); portalMsg('הקישור הועתק.', 'ok'); } catch (e) { await uiPrompt('העתיקו את הקישור:', r.portal_url); }
           return;
         } else if (act === 'revoke') {
-          if (!confirm('לנתק את הלקוח מהאיזור האישי? הוא יוכל להיכנס שוב עם קוד חדש.')) return;
+          if (!await uiConfirm('לנתק את הלקוח מהאיזור האישי? הוא יוכל להיכנס שוב עם קוד חדש.')) return;
           res = await portalAction({ action: 'revoke_sessions' }, b);
         } else if (act === 'disable') {
-          var reason = prompt('חסימת הגישה של הלקוח לאיזור האישי. הלקוח ינותק מיד ולא יקבל קוד כניסה.\nסיבה (לא חובה, לא מוצגת ללקוח):', '');
+          var reason = await uiPrompt('חסימת הגישה של הלקוח לאיזור האישי. הלקוח ינותק מיד ולא יקבל קוד כניסה.\nסיבה (לא חובה, לא מוצגת ללקוח):', '');
           if (reason === null) return;
           res = await portalAction({ action: 'set_access', enabled: false, reason: reason }, b);
         } else if (act === 'enable') {
