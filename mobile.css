@@ -1,0 +1,89 @@
+/* ============================================================
+   ידידיה מוטורס — התאמה לטלפון
+   נטען אחרון בכל עמוד, כדי לגבור על כללי העמוד באותה רמת ספציפיות.
+   ============================================================ */
+@media (max-width: 760px) {
+
+  /* --- iOS: שדה מתחת ל-16px גורם לזום אוטומטי שלא חוזר --- */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* --- סרגל עליון: חיפוש גלוי ברוחב מלא, כפתורים בשורה אחת --- */
+  .topbar .tools { gap: 8px; width: 100%; }
+  .topbar .tools .search {
+    display: flex; order: -1; flex: 1 1 100%; min-width: 0; width: 100%;
+  }
+  .topbar .tools .btn-primary, .topbar .tools .btn-ghost { flex: 1 1 0; justify-content: center; min-width: 0; }
+  .topbar .tools .avatar { flex: none; }
+  .greeting { font-size: 23px; }
+
+  /* --- טאבים: שורה אחת עם גלילה, בלי שבירת מילים --- */
+  .tabs { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { white-space: nowrap; flex: none; padding: 11px 12px; }
+
+  /* --- חלונות: מסך מלא בטלפון, כפתור סגירה תמיד בהישג יד --- */
+  .modal { padding: 0; align-items: stretch; }
+  .modal-box, .modal-box.wide {
+    max-width: none !important; width: 100%; min-height: 100vh; min-height: 100dvh;
+    border-radius: 0; border: 0; padding: 58px 16px 28px;
+  }
+  .modal-x {
+    position: fixed !important; top: 8px !important; inset-inline-end: 8px !important;
+    width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; background: var(--surface-raised) !important; border: 1px solid var(--border) !important;
+    z-index: 80;
+  }
+  .modal-box h2 { font-size: 18px; margin-bottom: 14px; padding-inline-end: 40px; }
+  .modal-actions { flex-wrap: wrap; }
+  .modal-actions > .btn-primary, .modal-actions > .btn-ghost { flex: 1 1 140px; justify-content: center; }
+
+  /* --- כפתורים קטנים: יעד מגע סביר --- */
+  .btn-icon { min-height: 36px; padding: 7px 12px; font-size: 13px; }
+  .btn-primary.small, .btn-ghost.small { height: 40px; }
+  select.small { min-height: 38px; }
+
+  /* --- כרטיס לקוח: פחות ריפוד מקונן, יותר רוחב לתוכן --- */
+  .order { padding: 12px 10px; border-radius: 8px; }
+  .order .deal, .deal { padding: 10px; }
+  .reg-line { padding: 8px; }
+  .reg-line .v { min-width: 0; flex-basis: 100%; }
+  .card-tools > button { flex: 1 1 0; justify-content: center; }
+  .deal .actions > * { flex: 1 1 140px; }
+  .agr-row { flex-direction: column; align-items: stretch; }
+  .agr-btns > * { flex: 1 1 auto; text-align: center; }
+  .order-acts > button { flex: 1 1 100%; }
+  .order-sum { grid-template-columns: 1fr 1fr; }
+  .cart-add > * { flex: 1 1 auto; }
+  .cart-add .cart-qty { flex: 0 0 64px; }
+  .terms-grid { grid-template-columns: 1fr 1fr; }
+
+  /* --- מטריצת ההרשאות: כרטיס לכל הרשאה במקום טבלה רחבה --- */
+  .matrix-scroll { overflow-x: visible; }
+  .matrix-head { display: none; }
+  .matrix-cat { padding: 12px 14px 6px; }
+  .matrix-row {
+    min-width: 0; grid-template-columns: repeat(4, 1fr); gap: 8px 6px; padding: 12px 14px;
+  }
+  .matrix-row > div:first-child { grid-column: 1 / -1; text-align: start; }
+  .matrix-row .m-cell { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .matrix-row .m-cell::before {
+    content: attr(data-role-label); font-size: 10.5px; color: var(--text-fainter); text-align: center; line-height: 1.2;
+  }
+  .matrix-row .p-key { text-align: start; }
+
+  /* --- רשימות ופסים כלליים --- */
+  .filter-group { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .filter-group::-webkit-scrollbar { display: none; }
+  .filter-group .chip { flex: none; }
+}
+
+@media (max-width: 380px) {
+  .main { padding: 14px 10px 28px; }
+  .kpis { gap: 8px; }
+  .order-sum { grid-template-columns: 1fr; }
+}
+
+/* תפריטי בחירה קטנים בכרטיס העסקה — כהים כמו שאר השדות (היו לבנים) */
+.deal select.small, .actions select.small, .owner-line select.small {
+  background: #101216; color: var(--text-body); border: 1px solid var(--border-input); border-radius: 6px;
+}

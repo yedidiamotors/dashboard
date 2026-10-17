@@ -399,7 +399,7 @@
         m.roles.map(function (r) {
           var isLocked = r.key === 'admin' && locked.indexOf(p.key) > -1;
           var on = !!(p.roles || {})[r.key];
-          return '<div><input class="sw" type="checkbox"' + (on ? ' checked' : '') +
+          return '<div class="m-cell" data-role-label="' + E(r.label_he) + '"><input class="sw" type="checkbox"' + (on ? ' checked' : '') +
             (isLocked ? ' disabled' : '') +
             ' data-role="' + E(r.key) + '" data-key="' + E(p.key) + '">' +
             (isLocked ? '<span class="locked-note">נעול</span>' : '') + '</div>';
