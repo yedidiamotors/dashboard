@@ -230,6 +230,7 @@
     state.card = res;
     document.getElementById('card-body').innerHTML = cardHtml(res);
     bindCard(res);
+    loadPortal(id);
   }
 
   function cardHtml(res) {
@@ -252,6 +253,11 @@
     if (!deals.length) h += '<div class="empty small">אין עסקאות עדיין.</div>';
     deals.forEach(function (d) { h += dealHtml(d, res.viewer); });
     h += '</div>';
+
+    // ההרשאה נבדקת בשרת; סשן שנפתח לפני הוספת ההרשאה עדיין לא מכיר אותה ברשימה המקומית
+    if (can('manage_customer_portal') || can('create_customer_deal')) {
+      h += '<div class="sect" id="portal-sect"><h3>האיזור האישי של הלקוח</h3><div class="empty small">טוען…</div></div>';
+    }
 
     h += '<div class="sect"><h3>מסמכי לקוח קבועים</h3>' +
       (docs.length ? '<div class="docs">' + docs.map(function (x) {
@@ -890,6 +896,168 @@
       }
     });
     load(false);
+  }
+
+  /* ---------- האיזור האישי של הלקוח (ניהול) ----------
+     כל הכללים בשרת (customer_portal_admin): איש מכירות — רק הלקוחות שלו; חסימה מנתקת מיד. */
+  var portal = { data: null, customerId: null, msg: null };
+
+  async function loadPortal(customerId) {
+    var host = document.getElementById('portal-sect');
+    if (!host) return;
+    portal.customerId = customerId;
+    var r;
+    try { r = await YM.api('/customers/portal', { token: session.token, customer_id: customerId, action: 'status' }); }
+    catch (err) { host.innerHTML = '<h3>האיזור האישי של הלקוח</h3><div class="empty small">' + E(err.message) + '</div>'; return; }
+    if (state.cardId !== customerId) return;
+    if (r.ok !== true) {
+      if (r.error === 'PERMISSION_DENIED') { host.remove(); return; }
+      host.innerHTML = '<h3>האיזור האישי של הלקוח</h3><div class="empty small">' + E(r.message_he || 'לא ניתן לטעון.') + '</div>'; return;
+    }
+    portal.data = r;
+    host.innerHTML = portalHtml(r);
+    bindPortal(host, r);
+    if (portal.msg) { portalMsg(portal.msg.text, portal.msg.kind); portal.msg = null; }
+  }
+
+  function portalHtml(r) {
+    var c = r.customer, s = r.sessions || {};
+    var state1, cls;
+    if (c.disabled_at) { state1 = 'הגישה חסומה' + (c.disabled_by ? ' ע"י ' + E(c.disabled_by) : '') + ' · ' + fmtDT(c.disabled_at) + (c.disabled_reason ? ' · ' + E(c.disabled_reason) : ''); cls = 'off'; }
+    else if (!c.can_login) { state1 = 'אין מספר טלפון — הלקוח לא יכול להיכנס. יש להשלים טלפון בעריכת הפרטים.'; cls = 'off'; }
+    else if (s.active_now) { state1 = 'מחובר עכשיו'; cls = 'on'; }
+    else if (s.last_login) { state1 = 'נכנס לאחרונה ' + fmtDT(s.last_seen || s.last_login) + ' · ' + s.total + ' כניסות'; cls = 'on'; }
+    else { state1 = 'עוד לא נכנס לאיזור האישי'; cls = 'idle'; }
+
+    var h = '<h3>האיזור האישי של הלקוח</h3><div class="pt-msg" role="status"></div><div class="pt-box">' +
+      '<div class="pt-status ' + cls + '"><span class="dot"></span><span>' + state1 + '</span></div>' +
+      '<div class="pt-link"><span class="ltr">' + E(r.portal_url) + '</span> · כניסה עם ' + E(c.phone_he || 'הטלפון של הלקוח') + ' וקוד חד-פעמי</div>';
+
+    // פעולות
+    h += '<div class="actions">';
+    if (!c.disabled_at && c.can_login) {
+      h += '<button class="btn-primary small" type="button" data-pt="invite-wa">שליחת הזמנה בוואטסאפ</button>' +
+           '<button class="btn-ghost small" type="button" data-pt="invite-email"' + (c.invoice_email ? '' : ' disabled title="אין ללקוח מייל"') + '>הזמנה במייל</button>';
+      (r.end_users || []).forEach(function (u) {
+        h += '<button class="btn-ghost small" type="button" data-pt="invite-eu" data-deal="' + E(u.deal_id) + '">הזמנה לנהג בפועל (' + E(u.name) + ')</button>';
+      });
+    }
+    h += '<button class="btn-ghost small" type="button" data-pt="copy">העתקת הקישור</button>';
+    if (s.open) h += '<button class="btn-icon" type="button" data-pt="revoke">ניתוק (' + s.open + ')</button>';
+    h += c.disabled_at ? '<button class="btn-icon" type="button" data-pt="enable">פתיחת הגישה</button>'
+                       : '<button class="btn-icon danger" type="button" data-pt="disable">חסימת גישה</button>';
+    h += '</div></div>';
+
+    // עסקאות: התקדמות + עדכונים
+    (r.deals || []).forEach(function (d) {
+      var pr = d.progress || {}, cur = (pr.steps || []).filter(function (x) { return x.state === 'current'; })[0];
+      h += '<div class="pt-deal" data-deal="' + E(d.id) + '"><div class="pt-deal-head"><b>' + E(d.title) + '</b>' +
+        '<span class="pt-mini">' + (cur ? 'הלקוח רואה: ' + E(cur.label_he) + ' (' + pr.current + '/6)' : (pr.current === 6 ? 'הלקוח רואה: נמסר' : 'אין רכב משויך — ציר ההתקדמות מוסתר')) + '</span>' +
+        (d.waiting_on_customer ? '<span class="pt-flag">ממתין ללקוח: ' + d.waiting_on_customer + ' מסמכים</span>' : '') +
+        (d.agreement_pending ? '<span class="pt-flag">הסכם ממתין לחתימה</span>' : '') + '</div>';
+      if (!d.closed) {
+        h += '<form class="pt-post"><textarea rows="2" maxlength="1500" placeholder="עדכון ללקוח — יופיע באיזור האישי שלו (למשל: הרכב שוחרר מהמכס, נקבע מועד מסירה…)" required></textarea>' +
+          '<div class="pt-post-row"><label class="check"><input type="checkbox" name="notify"' + (portal.data.customer.invoice_email ? '' : ' disabled') + '> לשלוח גם במייל' + (portal.data.customer.invoice_email ? '' : ' (אין מייל)') + '</label>' +
+          '<button class="btn-primary small" type="submit">פרסום</button></div></form>';
+      }
+      var ups = d.updates || [];
+      if (ups.length) {
+        h += '<div class="pt-updates">' + ups.map(function (u) {
+          return '<div class="pt-upd' + (u.hidden ? ' hidden-upd' : '') + '"><div class="t">' + fmtDT(u.at) + (u.by ? ' · ' + E(u.by) : '') +
+            (u.notified_via === 'email' ? ' · נשלח במייל' : '') + (u.hidden ? ' · מוסתר מהלקוח' : '') + '</div>' +
+            '<div class="b">' + E(u.body) + '</div>' +
+            '<button class="linkish" type="button" data-upd="' + E(u.id) + '" data-hidden="' + (u.hidden ? '1' : '0') + '">' + (u.hidden ? 'להציג שוב' : 'הסתרה') + '</button></div>';
+        }).join('') + '</div>';
+      }
+      h += '</div>';
+    });
+
+    // מה הלקוח העלה
+    var ups2 = r.uploads || [];
+    if (ups2.length) {
+      h += '<div class="pt-sub">מה הלקוח העלה</div><div class="docs">' + ups2.map(function (x) {
+        return '<span class="doc">' + (x.url ? '<a href="' + E(x.url) + '" target="_blank" rel="noopener">' + E(x.label) + '</a>' : E(x.label)) + ' · ' + fmtDate(x.at) + '</span>';
+      }).join('') + '</div><div class="pt-hint">אחרי בדיקה — לסמן "אומת" ב-checklist של העסקה.</div>';
+    }
+
+    // היסטוריה
+    var hist = (r.logins || []).map(function (l) { return { at: l.at, txt: 'כניסה' + (l.is_end_user ? ' (נהג בפועל)' : '') + ' · ' + l.device }; })
+      .concat((r.invites || []).map(function (i) { return { at: i.at, txt: 'הזמנה ' + (i.channel === 'email' ? 'במייל' : 'בוואטסאפ') + ' ל-' + (i.to || '') + (i.by ? ' · ע"י ' + i.by : '') }; }))
+      .sort(function (a, b) { return a.at < b.at ? 1 : -1; }).slice(0, 10);
+    if (hist.length) {
+      h += '<details class="pt-hist"><summary>היסטוריית כניסות והזמנות</summary><div class="timeline">' + hist.map(function (x) {
+        return '<div class="tl"><div class="t">' + fmtDT(x.at) + '</div><div>' + E(x.txt) + '</div></div>';
+      }).join('') + '</div></details>';
+    }
+    return h;
+  }
+
+  async function portalAction(payload, btn) {
+    if (btn) btn.disabled = true;
+    var r;
+    try { r = await YM.api('/customers/portal', Object.assign({ token: session.token, customer_id: portal.customerId }, payload)); }
+    catch (err) { r = { ok: false, message_he: err.message }; }
+    if (btn) btn.disabled = false;
+    var text = r.message_he || (r.ok ? 'בוצע.' : 'הפעולה נכשלה.'), kind = r.ok && !r.email_failed ? 'ok' : 'err';
+    if (r.ok) portal.msg = { text: text, kind: kind };   // יוצג אחרי הרענון
+    else portalMsg(text, kind);
+    return r;
+  }
+  function portalMsg(text, kind) {
+    var el = document.querySelector('#portal-sect .pt-msg');
+    if (!el) { notice(text, kind); return; }
+    el.innerHTML = '<div class="banner ' + (kind === 'err' ? '' : 'info') + '">' + E(text) + '</div>';
+    if (kind !== 'err') setTimeout(function () { el.innerHTML = ''; }, 6000);
+  }
+
+  function bindPortal(host, r) {
+    host.querySelectorAll('[data-pt]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var act = b.getAttribute('data-pt'), res;
+        if (act === 'invite-wa' || act === 'invite-eu') {
+          // חלון נפתח מיד (בתוך הלחיצה) כדי שהדפדפן לא יחסום אותו; הכתובת נקבעת אחרי תשובת השרת
+          var w = window.open('', '_blank');
+          res = await portalAction({ action: 'invite', channel: 'whatsapp', end_user_deal_id: b.getAttribute('data-deal') || null }, b);
+          if (res.ok && res.wa_phone) {
+            var url = 'https://wa.me/' + res.wa_phone + '?text=' + encodeURIComponent(res.wa_text);
+            if (w) w.location.href = url; else location.href = url;
+          } else if (w) w.close();
+        } else if (act === 'invite-email') {
+          if (!confirm('לשלוח ללקוח מייל עם הקישור לאיזור האישי?')) return;
+          res = await portalAction({ action: 'invite', channel: 'email' }, b);
+        } else if (act === 'copy') {
+          try { await navigator.clipboard.writeText(r.portal_url); portalMsg('הקישור הועתק.', 'ok'); } catch (e) { prompt('העתיקו את הקישור:', r.portal_url); }
+          return;
+        } else if (act === 'revoke') {
+          if (!confirm('לנתק את הלקוח מהאיזור האישי? הוא יוכל להיכנס שוב עם קוד חדש.')) return;
+          res = await portalAction({ action: 'revoke_sessions' }, b);
+        } else if (act === 'disable') {
+          var reason = prompt('חסימת הגישה של הלקוח לאיזור האישי. הלקוח ינותק מיד ולא יקבל קוד כניסה.\nסיבה (לא חובה, לא מוצגת ללקוח):', '');
+          if (reason === null) return;
+          res = await portalAction({ action: 'set_access', enabled: false, reason: reason }, b);
+        } else if (act === 'enable') {
+          res = await portalAction({ action: 'set_access', enabled: true }, b);
+        }
+        if (res && res.ok) loadPortal(portal.customerId);
+      });
+    });
+    host.querySelectorAll('.pt-post').forEach(function (f) {
+      f.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var dealId = f.closest('.pt-deal').getAttribute('data-deal'), ta = f.querySelector('textarea');
+        var body = ta.value.trim();
+        if (body.length < 2) { portalMsg('כתבו את העדכון.', 'err'); return; }
+        var res = await portalAction({ action: 'post_update', deal_id: dealId, body: body, notify: f.notify.checked ? 'email' : null }, f.querySelector('button'));
+        if (res.ok) loadPortal(portal.customerId);
+      });
+    });
+    host.querySelectorAll('[data-upd]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var hidden = b.getAttribute('data-hidden') === '1';
+        var res = await portalAction({ action: 'hide_update', update_id: b.getAttribute('data-upd'), hidden: !hidden }, b);
+        if (res.ok) loadPortal(portal.customerId);
+      });
+    });
   }
 
   /* ---------- העלאת קבצים ל-Drive ---------- */
