@@ -260,6 +260,7 @@
     h += '</div>';
 
     /* תמונות לאתר — הסדר והתמונה הראשית נקבעים כאן */
+    h += YM.share.html(res.share, { hidden_note: 'הרכב לא מתפרסם כרגע באתר, ולכן אין לו קישור מודעה. כשיסומן "מופיע באתר" בכרטיסיית הטריידאין ויעלה לאתר, הקישור יופיע כאן.' });
     h += '<div class="sect" id="photos-sect"><h3>תמונות לאתר</h3><p class="note">טוען…</p></div>';
 
     /* עסקה משויכת */
@@ -287,6 +288,7 @@
 
   function bindCard(res) {
     var t = res.trade_in || {}, v = res.viewer || {};
+    YM.share.bind(document.getElementById('card-body'), res.share);
 
     YM.photos.open({
       hostId: 'photos-sect', inputId: 'photo-input', token: session.token,

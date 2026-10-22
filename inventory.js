@@ -304,6 +304,7 @@
 
   function bindCard(res) {
     var v = res.vehicle || {};
+    YM.share.bind(document.getElementById('card-body'), v.share);
     var eb = document.getElementById('v-edit');
     if (eb) eb.addEventListener('click', function () { YM.vehicleForm.openEdit(res); });
     var up = document.getElementById('vdoc-up');
@@ -371,6 +372,8 @@
         ? '<div class="card-tools"><button class="btn-icon primary" type="button" id="v-edit">עריכת פרטי הרכב</button></div>'
         : '') +
       '</div>';
+
+    h += YM.share.html(v.share);
 
     h += section('זיהוי', [
       kv('מספר שלדה', v.vin, 'num'),
