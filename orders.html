@@ -50,7 +50,7 @@
 
     <div class="tabs" role="tablist">
       <button class="tab is-active" type="button" data-tab="board" role="tab">רכבים בתהליך <span class="tab-count" id="count-board" hidden></span></button>
-      <button class="tab" type="button" data-tab="containers" role="tab">מכולות <span class="tab-count" id="count-containers" hidden></span></button>
+      <button class="tab" type="button" data-tab="containers" role="tab">מעקב מכולות <span class="tab-count" id="count-containers" hidden></span></button>
       <button class="tab" type="button" data-tab="quotas" role="tab">מכסות רישיון יבוא <span class="tab-count" id="count-quotas" hidden></span></button>
     </div>
 
@@ -64,6 +64,7 @@
     </section>
 
     <section id="panel-containers" hidden>
+      <p class="hint">מכולה נפתחת כאן אוטומטית כשמגיע למייל ai@ מיאיר אישור בוקינג, הודעת שילוח או שטר מטען — עם מספר הבוקינג, האונייה וה-ETA, והרכבים שבמסמך משובצים אליה לפי VIN. כל עדכון נוסף (שינוי ETA, אונייה, מספר מכולה) נכנס לציר הזמן של המכולה.</p>
       <div id="containers"></div>
     </section>
 
@@ -152,18 +153,35 @@
     <form id="container-form" class="form" novalidate>
       <input type="hidden" name="container_id">
       <div class="grid2">
-        <div class="field"><label for="c-number">מספר מכולה</label><input id="c-number" name="container_number" dir="ltr"></div>
+        <div class="field"><label for="c-number">מספר מכולה</label><input id="c-number" name="container_number" dir="ltr" placeholder="ZCSU8012345"></div>
+        <div class="field"><label for="c-booking">מספר בוקינג</label><input id="c-booking" name="booking_number" dir="ltr"></div>
+        <div class="field"><label for="c-bl">שטר מטען (B/L)</label><input id="c-bl" name="bl_number" dir="ltr"></div>
+        <div class="field"><label for="c-fwd">משלח / חברת שילוח</label><input id="c-fwd" name="freight_forwarder"></div>
         <div class="field"><label for="c-vessel">אונייה</label><input id="c-vessel" name="vessel_name" dir="ltr"></div>
         <div class="field"><label for="c-line">חברת ספנות</label><input id="c-line" name="shipping_line"></div>
         <div class="field"><label for="c-voyage">מספר הפלגה</label><input id="c-voyage" name="voyage_number" dir="ltr"></div>
+        <div class="field"><label for="c-pol">נמל טעינה</label><input id="c-pol" name="port_of_loading" dir="ltr"></div>
+        <div class="field"><label for="c-pod">נמל יעד</label><input id="c-pod" name="port_of_discharge" dir="ltr"></div>
+        <div class="field"><label for="c-etd">ETD (יציאה משוערת)</label><input id="c-etd" name="etd" type="date"></div>
+        <div class="field"><label for="c-dep">עלתה לאונייה בפועל</label><input id="c-dep" name="departed_at" type="date"></div>
         <div class="field"><label for="c-eta">ETA (הגעה משוערת)</label><input id="c-eta" name="eta" type="date"></div>
         <div class="field"><label class="check" style="margin-top:26px"><input type="checkbox" name="telex_release"> טלקס רליס התקבל</label></div>
       </div>
+      <div class="field"><label for="c-notes">הערות</label><input id="c-notes" name="notes"></div>
       <div class="modal-actions">
         <button class="btn-primary" type="submit">שמירה</button>
         <button class="btn-ghost" type="button" data-close="container-modal">ביטול</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- מעקב מכולה -->
+<div class="modal" id="track-modal" hidden>
+  <div class="modal-box wide" role="dialog" aria-modal="true" aria-labelledby="track-title">
+    <button class="modal-x" type="button" data-close="track-modal" aria-label="סגירה">×</button>
+    <h2 id="track-title">מעקב מכולה</h2>
+    <div id="track-body"><div class="empty small">טוען…</div></div>
   </div>
 </div>
 

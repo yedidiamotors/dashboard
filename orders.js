@@ -40,6 +40,15 @@
     render();
     document.getElementById('boot').hidden = true;
     document.getElementById('shell').hidden = false;
+    if (first) openFromUrl();
+  }
+
+  // קישור ישיר: orders.html?container=<id> פותח את לשונית המכולות ואת מסך המעקב
+  function openFromUrl() {
+    var m = /[?&]container=([0-9a-f-]{36})/i.exec(location.search);
+    if (!m) return;
+    switchTab('containers');
+    openTracking(m[1]);
   }
 
   function bootError(text) {
@@ -62,7 +71,8 @@
     document.getElementById('avatar').textContent = YM.initials(session.user && session.user.name);
     document.getElementById('eyebrow').textContent = YM.roleHe(session.user && session.user.role);
     var open = (data.containers || []).filter(function (c) { return c.status !== 'ready'; });
-    document.getElementById('meta-line').textContent = data.vehicles.length + ' רכבים בתהליך יבוא · ' + open.length + ' מכולות פעילות';
+    var late = open.filter(function (c) { return c.eta_overdue; }).length;
+    document.getElementById('meta-line').textContent = data.vehicles.length + ' רכבים בתהליך יבוא · ' + open.length + ' מכולות במעקב' + (late ? ' · ' + late + ' עם ETA שעבר' : '');
     document.getElementById('side-box').innerHTML =
       '<div class="stat-box"><div class="label">בדרך לארץ</div><div class="stat-figure">' + data.vehicles.filter(function (v) { return ['at_sea','port','customs'].indexOf(v.stage) > -1; }).length + '</div>' +
       '<div class="stat-note">' + data.vehicles.filter(function (v) { return v.stage === 'pending'; }).length + ' ממתינים לאישור</div></div>';
@@ -109,7 +119,7 @@
     else if (v.stage === 'approved') meta.push('<span class="tag warn">אין תקן — נדרש למכסה</span>');
     if (v.supplier_name) meta.push('<span class="tag">' + E(v.supplier_name) + (v.purchase_country ? ' · ' + E(v.purchase_country) : '') + '</span>');
     if (v.purchase_price != null) meta.push('<span class="tag">' + E(v.purchase_currency || '') + ' ' + Number(v.purchase_price).toLocaleString('en-US') + '</span>');
-    if (v.container_number) meta.push('<span class="tag">מכולה ' + E(v.container_number) + ' · ' + E(v.container_status_he) + (v.container_eta ? ' · ETA ' + fmtDate(v.container_eta) : '') + '</span>');
+    if (v.container_id) meta.push('<a class="tag link" href="orders.html?container=' + E(v.container_id) + '" data-container="' + E(v.container_id) + '">מכולה ' + E(v.container_number || '') + ' · ' + E(v.container_status_he) + (v.container_eta ? ' · ETA ' + fmtDate(v.container_eta) : '') + '</a>');
     if (v.quota_request_number) meta.push('<span class="tag">מכסה ' + E(v.quota_request_number) + '</span>');
     if (v.requested_customer_name) meta.push('<span class="tag ok">מבוקש: ' + E(v.requested_customer_name) + '</span>');
     if (v.customs && v.customs.total) meta.push('<span class="tag' + (v.customs.done === v.customs.total ? ' ok' : '') + '">מכס ' + v.customs.done + '/' + v.customs.total + '</span>');
@@ -153,6 +163,9 @@
     document.querySelectorAll('#board .veh').forEach(function (el) {
       var id = el.getAttribute('data-id');
       var v = data.vehicles.filter(function (x) { return x.id === id; })[0];
+      el.querySelectorAll('[data-container]').forEach(function (a) {
+        a.addEventListener('click', function (e) { e.preventDefault(); switchTab('containers'); openTracking(a.getAttribute('data-container')); });
+      });
       el.querySelectorAll('[data-act]').forEach(function (b) {
         b.addEventListener('click', function () {
           var act = b.getAttribute('data-act');
@@ -196,7 +209,7 @@
   function openBook(v) {
     bForm.reset(); bForm.vehicle_id.value = v.id;
     document.getElementById('book-line').textContent = v.title + ' · VIN ' + (v.vin || '—') + ' · תקן ' + (STD_HE[v.standard_type] || 'לא הוגדר');
-    var open = (data.containers || []).filter(function (c) { return c.status === 'pending' && (c.vehicles || []).length < c.capacity; });
+    var open = (data.containers || []).filter(function (c) { return c.status === 'pending' && c.container_number && (c.vehicles || []).length < c.capacity; });
     bForm.existing.innerHTML = '<option value="">מכולה חדשה…</option>' + open.map(function (c) {
       return '<option value="' + E(c.container_number) + '">' + E(c.container_number) + ' (' + (c.vehicles || []).length + '/' + c.capacity + ')' + (c.vehicles.length ? ' · ' + E(c.vehicles.map(function (x) { return x.title; }).join(', ')) : '') + '</option>';
     }).join('');
@@ -278,59 +291,214 @@
     });
   }
 
-  /* ---------- מכולות ---------- */
+  /* ---------- מעקב מכולות ---------- */
+  var NEXT_LABEL = { at_sea: 'יצאה לדרך', port_arrival: 'הגיעה לנמל', customs: 'נכנסה למכס', ready: 'שוחררה — למלאי בארץ' };
+  var NEXT_MSG = {
+    at_sea: 'המכולה יצאה לדרך? הרכבים שבה יעברו ל"בדרך" ומרגע זה מותר לשייך להם לקוח (פריסייל).',
+    port_arrival: 'המכולה הגיעה לנמל?', customs: 'המכולה נכנסה למכס?', ready: 'המכולה שוחררה? הרכבים שבה ייכנסו למלאי בארץ.'
+  };
+
+  function contName(c) {
+    if (c.container_number) return c.container_number;
+    if (c.booking_number) return 'בוקינג ' + c.booking_number;
+    if (c.bl_number) return 'B/L ' + c.bl_number;
+    return 'מכולה ללא מספר';
+  }
+  function stepsHtml(status) {
+    var idx = CSTEPS.findIndex(function (s) { return s[0] === status; });
+    return CSTEPS.map(function (s, i) { return '<span class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '">' + s[1] + '</span>'; }).join('<span class="sep">›</span>');
+  }
+  function nextStep(status) {
+    var idx = CSTEPS.findIndex(function (s) { return s[0] === status; });
+    return idx >= 0 && idx < CSTEPS.length - 1 ? CSTEPS[idx + 1][0] : null;
+  }
+  function etaText(c) {
+    if (!c.eta) return null;
+    var days = Math.round((new Date(c.eta + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000);
+    var rel = c.status === 'pending' || c.status === 'at_sea'
+      ? (days > 0 ? 'בעוד ' + days + ' ימים' : days === 0 ? 'היום' : 'עבר לפני ' + (-days) + ' ימים')
+      : null;
+    return fmtDate(c.eta) + (rel ? ' · ' + rel : '');
+  }
+  function routeText(c) {
+    if (!c.port_of_loading && !c.port_of_discharge) return null;
+    // הסדר הוא תמיד טעינה ואחריה יעד; החץ נבחר לפי כיוון הכתב של שמות הנמלים
+    var rtl = /[\u0590-\u05FF]/.test((c.port_of_loading || '') + (c.port_of_discharge || ''));
+    return (c.port_of_loading || '?') + (rtl ? ' ← ' : ' → ') + (c.port_of_discharge || '?');
+  }
+
   function renderContainers() {
     var host = document.getElementById('containers');
     var list = data.containers || [];
-    if (!list.length) { host.innerHTML = '<div class="empty">אין מכולות עדיין. מכולה נפתחת בשיבוץ הרכב הראשון אליה (בלוח הרכבים).</div>'; return; }
+    if (!list.length) {
+      host.innerHTML = '<div class="empty">אין מכולות במעקב. מכולה נפתחת אוטומטית כשיאיר שולח למייל אישור בוקינג או שטר מטען, או ידנית בשיבוץ רכב למכולה (בלוח הרכבים).</div>';
+      return;
+    }
     host.innerHTML = list.map(function (c) {
-      var idx = CSTEPS.findIndex(function (s) { return s[0] === c.status; });
-      var steps = CSTEPS.map(function (s, i) { return '<span class="' + (i < idx ? 'done' : i === idx ? 'now' : '') + '">' + s[1] + '</span>'; }).join('<span style="border:0;padding:0">›</span>');
       var vehs = (c.vehicles || []).map(function (v) { return '<span class="doc">' + E(v.title) + ' · ' + E(v.vin_tail) + (v.color ? ' · ' + E(v.color) : '') + ' · ' + E(v.status_he) + '</span>'; });
       for (var i = vehs.length; i < c.capacity; i++) vehs.push('<span class="doc empty-slot">מקום פנוי</span>');
-      var next = idx >= 0 && idx < CSTEPS.length - 1 ? CSTEPS[idx + 1] : null;
-      var nextLabel = next ? ({ at_sea: 'יצאה לדרך', port_arrival: 'הגיעה לנמל', customs: 'נכנסה למכס', ready: 'שוחררה — למלאי בארץ' })[next[0]] : null;
-      var acts = canManage ? '<button class="btn-icon" type="button" data-act="edit">פרטי מכולה</button>' +
-        (next ? '<button class="btn-icon primary" type="button" data-act="advance" data-status="' + next[0] + '">' + E(nextLabel) + '</button>' : '') : '';
+      var flags = [];
+      if (c.source === 'email') flags.push('<span class="tag">נפתחה מהמייל</span>');
+      if (!c.container_number) flags.push('<span class="tag warn">ממתין למספר מכולה</span>');
+      if (c.eta_overdue) flags.push('<span class="tag warn">ה-ETA עבר — לעדכן</span>');
+      if (c.expected_unlinked) flags.push('<span class="tag warn">' + c.expected_unlinked + ' רכבים מהמסמכים עוד לא שובצו</span>');
+      if (c.recent_warnings) flags.push('<span class="tag warn">' + c.recent_warnings + ' התראות</span>');
+      var next = nextStep(c.status);
+      var suggest = c.departure_suggested
+        ? '<div class="suggest">לפי המסמכים המכולה עלתה על האונייה ב-' + E(fmtDate(c.departed_at)) + '.' +
+          (canManage ? ' <button class="btn-icon primary" type="button" data-act="advance" data-status="at_sea">לאשר "יצאה לדרך"</button>' : '') + '</div>'
+        : '';
+      var acts = '<button class="btn-icon primary" type="button" data-act="track">מעקב מלא</button>' +
+        (c.tracking_url ? '<a class="btn-icon" href="' + E(c.tracking_url) + '" target="_blank" rel="noopener">באתר חברת הספנות ↗</a>' : '');
+      if (canManage) {
+        acts += '<button class="btn-icon" type="button" data-act="edit">פרטי מכולה</button>';
+        if (next && !(next === 'at_sea' && c.departure_suggested)) acts += '<button class="btn-icon" type="button" data-act="advance" data-status="' + next + '">' + E(NEXT_LABEL[next]) + '</button>';
+      }
+      var last = c.last_event ? '<div class="last-ev">עדכון אחרון: ' + E(c.last_event.title_he) + ' · ' + E(fmtDT(c.last_event.at)) + (c.last_event.source === 'email' ? ' · מהמייל' : '') + '</div>' : '';
       return '<div class="cont" data-id="' + E(c.id) + '">' +
-        '<div class="head"><span class="num">' + E(c.container_number) + '</span><span class="status-pill">' + E(c.status_he) + '</span></div>' +
-        '<div class="steps">' + steps + '</div>' +
-        '<div class="kv">' + kv('אונייה', c.vessel_name) + kv('חברת ספנות', c.shipping_line) + kv('הפלגה', c.voyage_number) + kv('ETA', c.eta ? fmtDate(c.eta) : null) +
+        '<div class="head"><span>' + (c.container_number ? '' : '<span class="num-l">' + (c.booking_number ? 'בוקינג' : 'שטר מטען') + '</span> ') +
+          '<span class="num">' + E(c.container_number || c.booking_number || c.bl_number || '—') + '</span></span><span class="status-pill">' + E(c.status_he) + '</span></div>' +
+        '<div class="steps">' + stepsHtml(c.status) + '</div>' +
+        suggest +
+        '<div class="kv">' + kv('ETA', etaText(c)) + kv('אונייה', c.vessel_name ? c.vessel_name + (c.voyage_number ? ' · ' + c.voyage_number : '') : null) +
+          kv('חברת ספנות', c.shipping_line) + kv('מסלול', routeText(c)) +
+          kv('בוקינג', c.container_number ? c.booking_number : null) + kv('שטר מטען', c.bl_number) +
           kv('טלקס רליס', c.telex_release ? 'התקבל' + (c.telex_release_at ? ' ' + fmtDate(c.telex_release_at) : '') : 'טרם') + kv('נפתחה', fmtDate(c.created_at)) + '</div>' +
-        '<div class="vehs">' + vehs.join('') + '</div>' +
-        (acts ? '<div class="actions">' + acts + '</div>' : '') +
+        (flags.length ? '<div class="meta">' + flags.join('') + '</div>' : '') +
+        '<div class="vehs">' + vehs.join('') + '</div>' + last +
+        '<div class="actions">' + acts + '</div>' +
       '</div>';
     }).join('');
     host.querySelectorAll('.cont').forEach(function (el) {
       var id = el.getAttribute('data-id');
       var c = list.filter(function (x) { return x.id === id; })[0];
       el.querySelectorAll('[data-act]').forEach(function (b) {
-        b.addEventListener('click', async function () {
-          if (b.getAttribute('data-act') === 'edit') { openContainer(c); return; }
-          var st = b.getAttribute('data-status');
-          var msg = { at_sea: 'המכולה יצאה לדרך? הרכבים שבה יעברו ל"בדרך" ומרגע זה מותר לשייך להם לקוח (פריסייל).', port_arrival: 'המכולה הגיעה לנמל?', customs: 'המכולה נכנסה למכס?', ready: 'המכולה שוחררה? הרכבים שבה ייכנסו למלאי בארץ.' }[st];
-          if (!confirm(msg)) return;
-          var r = await call('/import/container', { container: { container_id: id, status: st } });
-          if (r.ok) load(false);
+        b.addEventListener('click', function () {
+          var act = b.getAttribute('data-act');
+          if (act === 'edit') openContainer(c);
+          else if (act === 'track') openTracking(c.id);
+          else if (act === 'advance') advance(c, b.getAttribute('data-status'));
         });
       });
     });
   }
   function kv(k, v) { return '<div><span class="k">' + E(k) + '</span><span class="v">' + E(v || '—') + '</span></div>'; }
 
+  async function advance(c, st) {
+    if (!confirm(NEXT_MSG[st])) return false;
+    var r = await call('/import/container', { container: { container_id: c.id, status: st } });
+    if (r.ok) { load(false); if (!document.getElementById('track-modal').hidden) openTracking(c.id); }
+    return r.ok;
+  }
+
+  /* ---------- מסך מעקב מלא ---------- */
+  var EV_ICON = { opened: '◎', booking: '⚓', document: '✉', status: '●', eta_changed: '⏱', departure_detected: '⚑', vehicle_linked: '+', vehicle_removed: '−', warning: '!', note: '✎' };
+  var trackId = null;
+
+  async function openTracking(id) {
+    trackId = id;
+    var body = document.getElementById('track-body');
+    body.innerHTML = '<div class="empty small">טוען…</div>';
+    document.getElementById('track-title').textContent = 'מעקב מכולה';
+    show('track-modal');
+    try { if (history.replaceState) history.replaceState(null, '', 'orders.html?container=' + encodeURIComponent(id)); } catch (e) {}
+    var r;
+    try { r = await YM.api('/import/container-tracking', { token: session.token, container_id: id }); }
+    catch (err) { body.innerHTML = '<div class="empty small">' + E(err.message) + '</div>'; return; }
+    if (trackId !== id) return;
+    if (r.ok !== true) { body.innerHTML = '<div class="empty small">' + E(r.message_he || 'לא ניתן לטעון את המכולה.') + '</div>'; return; }
+    renderTracking(r);
+  }
+
+  function renderTracking(r) {
+    var c = r.container, can = r.viewer && r.viewer.can_manage;
+    document.getElementById('track-title').textContent = contName(c);
+    var next = nextStep(c.status);
+    var head = '<div class="tr-head"><span class="status-pill">' + E(c.status_he) + '</span>' +
+      (c.eta ? '<span class="tr-eta' + (c.eta_overdue ? ' late' : '') + '">ETA ' + E(etaText(c)) + '</span>' : '<span class="tr-eta">אין ETA עדיין</span>') + '</div>' +
+      '<div class="steps">' + stepsHtml(c.status) + '</div>';
+    var alerts = '';
+    if (c.departure_suggested) alerts += '<div class="suggest">לפי המסמכים המכולה עלתה על האונייה ב-' + E(fmtDate(c.departed_at)) + '.' + (can ? ' <button class="btn-icon primary" type="button" data-tr="advance" data-status="at_sea">לאשר "יצאה לדרך"</button>' : '') + '</div>';
+    if (c.eta_overdue) alerts += '<div class="suggest warn">ה-ETA (' + E(fmtDate(c.eta)) + ') עבר והמכולה עדיין לא סומנה כהגיעה לנמל. לבדוק באתר חברת הספנות ולעדכן.</div>';
+    if (!c.container_number) alerts += '<div class="suggest warn">עדיין אין מספר מכולה — הרכבים ישובצו אוטומטית כשיגיע מייל עם המספר, או שאפשר להזין אותו ב"פרטי מכולה".</div>';
+
+    var details = '<div class="kv tr-kv">' +
+      kv('מספר מכולה', c.container_number) + kv('בוקינג', c.booking_number) + kv('שטר מטען', c.bl_number) + kv('חברת ספנות', c.shipping_line) +
+      kv('משלח', c.freight_forwarder) + kv('אונייה', c.vessel_name ? c.vessel_name + (c.voyage_number ? ' · ' + c.voyage_number : '') : null) +
+      kv('נמל טעינה', c.port_of_loading) + kv('נמל יעד', c.port_of_discharge) +
+      kv('ETD', c.etd ? fmtDate(c.etd) : null) + kv('עלתה לאונייה', c.departed_at ? fmtDate(c.departed_at) : null) +
+      kv('הגיעה לנמל', c.arrived_at ? fmtDate(c.arrived_at) : null) +
+      kv('טלקס רליס', c.telex_release ? 'התקבל' + (c.telex_release_at ? ' ' + fmtDate(c.telex_release_at) : '') : 'טרם') + '</div>' +
+      (c.notes ? '<div class="tr-notes">' + E(c.notes) + '</div>' : '');
+
+    var acts = (c.tracking_url ? '<a class="btn-icon" href="' + E(c.tracking_url) + '" target="_blank" rel="noopener">מעקב באתר חברת הספנות ↗</a>' : '');
+    if (can) {
+      acts += '<button class="btn-icon" type="button" data-tr="edit">פרטי מכולה</button>';
+      if (next && !(next === 'at_sea' && c.departure_suggested)) acts += '<button class="btn-icon primary" type="button" data-tr="advance" data-status="' + next + '">' + E(NEXT_LABEL[next]) + '</button>';
+    }
+
+    var vehs = (r.vehicles || []).map(function (v) {
+      var cu = v.customs && v.customs.total ? ' · מכס ' + v.customs.done + '/' + v.customs.total : '';
+      return '<a class="tr-veh" href="inventory.html?ref=' + encodeURIComponent(v.vin || v.id) + '"><span class="t">' + E(v.title || '—') + '</span>' +
+        '<span class="s">' + E([v.model_year, v.color, v.vin ? 'VIN ' + v.vin : null].filter(Boolean).join(' · ')) + '</span>' +
+        '<span class="s">' + E(v.status_he) + E(cu) + (v.requested_customer_name ? ' · מבוקש: ' + E(v.requested_customer_name) : '') + '</span></a>';
+    }).join('');
+    var missing = (r.expected_unlinked || []).map(function (m) {
+      return '<div class="tr-miss"><span class="ltr">' + E(m.vin) + '</span> · ' + (m.vehicle_id ? E(m.title || '') + ' · ' + E(m.status_he || '') + ' — לשבץ מלוח הרכבים' : 'אין תיק רכב במערכת') + '</div>';
+    }).join('');
+    var vehBlock = '<h3>רכבים במכולה (' + (r.vehicles || []).length + '/' + c.capacity + ')</h3>' +
+      (vehs ? '<div class="tr-vehs">' + vehs + '</div>' : '<div class="empty small">עדיין לא שובצו רכבים.</div>') +
+      (missing ? '<div class="tr-missing"><div class="k">הופיעו במסמכי המשלוח ועוד לא שובצו:</div>' + missing + '</div>' : '');
+
+    var docs = (r.documents || []).map(function (d) {
+      var label = E(d.doc_type_he || 'מסמך') + ' · ' + E(d.vin_tail || '') + (d.filename ? ' · <span class="ltr">' + E(d.filename) + '</span>' : '');
+      return d.drive_url ? '<a class="doc" href="' + E(d.drive_url) + '" target="_blank" rel="noopener">' + label + '</a>' : '<span class="doc">' + label + '</span>';
+    }).join('');
+    var docBlock = r.viewer && r.viewer.can_docs ? '<h3>מסמכי משלוח ומכס</h3>' + (docs ? '<div class="vehs">' + docs + '</div>' : '<div class="empty small">אין עדיין מסמכי משלוח בתיקי הרכבים.</div>') : '';
+
+    var events = (r.events || []).map(function (e) {
+      return '<li class="ev ev-' + E(e.type) + '"><span class="ic">' + E(EV_ICON[e.type] || '•') + '</span><div>' +
+        '<div class="t">' + E(e.title_he) + '</div>' +
+        (e.summary_he ? '<div class="sm">' + E(e.summary_he) + '</div>' : '') +
+        '<div class="m">' + E(fmtDT(e.at)) + (e.location ? ' · ' + E(e.location) : '') + ' · ' + E(e.source === 'email' ? 'מהמייל' : e.source === 'system' ? 'מערכת' : (e.by || 'ידני')) + '</div></div></li>';
+    }).join('');
+    var addForm = can ? '<form class="tr-add" id="tr-add" novalidate><input name="title_he" placeholder="הוספת עדכון לציר הזמן — למשל: המשלח אישר טעינה ביום שני" maxlength="500"><input name="location" placeholder="מיקום (אופציונלי)"><button class="btn-primary small" type="submit">הוספה</button></form>' : '';
+    var timeline = '<h3>ציר זמן</h3>' + addForm + (events ? '<ol class="timeline">' + events + '</ol>' : '<div class="empty small">אין עדיין אירועים.</div>');
+
+    var body = document.getElementById('track-body');
+    body.innerHTML = head + alerts + details + '<div class="tr-acts">' + acts + '</div>' + vehBlock + docBlock + timeline;
+    body.querySelectorAll('[data-tr]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var a = b.getAttribute('data-tr');
+        if (a === 'edit') { hide('track-modal'); openContainer(c); }
+        else if (a === 'advance') advance(c, b.getAttribute('data-status'));
+      });
+    });
+    var f = document.getElementById('tr-add');
+    if (f) f.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var t = f.title_he.value.trim();
+      if (!t) { f.title_he.focus(); return; }
+      var x = await call('/import/container-event', { event: { container_id: c.id, title_he: t, location: f.location.value.trim() } });
+      if (x.ok) { openTracking(c.id); load(false); }
+    });
+  }
+
   var cForm = document.getElementById('container-form');
+  var C_FIELDS = ['container_number', 'booking_number', 'bl_number', 'freight_forwarder', 'vessel_name', 'shipping_line', 'voyage_number',
+                  'port_of_loading', 'port_of_discharge', 'etd', 'departed_at', 'eta', 'notes'];
   function openContainer(c) {
     cForm.reset(); cForm.container_id.value = c.id;
-    document.getElementById('container-title').textContent = 'מכולה ' + c.container_number;
-    cForm.container_number.value = c.container_number || ''; cForm.vessel_name.value = c.vessel_name || '';
-    cForm.shipping_line.value = c.shipping_line || ''; cForm.voyage_number.value = c.voyage_number || '';
-    cForm.eta.value = c.eta || ''; cForm.telex_release.checked = !!c.telex_release;
+    document.getElementById('container-title').textContent = contName(c);
+    C_FIELDS.forEach(function (k) { if (cForm[k]) cForm[k].value = c[k] || ''; });
+    cForm.telex_release.checked = !!c.telex_release;
     show('container-modal');
   }
   cForm.addEventListener('submit', async function (e) {
     e.preventDefault();
-    var r = await call('/import/container', { container: { container_id: cForm.container_id.value, container_number: cForm.container_number.value, vessel_name: cForm.vessel_name.value,
-      shipping_line: cForm.shipping_line.value, voyage_number: cForm.voyage_number.value, eta: cForm.eta.value || null, telex_release: cForm.telex_release.checked } });
+    var p = { container_id: cForm.container_id.value, telex_release: cForm.telex_release.checked };
+    C_FIELDS.forEach(function (k) { if (cForm[k]) p[k] = cForm[k].value.trim() || null; });
+    var r = await call('/import/container', { container: p });
     if (r.ok) { hide('container-modal'); load(false); }
   });
 
@@ -387,12 +555,12 @@
   document.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', function () { hide(b.getAttribute('data-close')); }); });
   document.querySelectorAll('.modal').forEach(function (m) { m.addEventListener('click', function (e) { if (e.target === m) m.hidden = true; }); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.modal').forEach(function (m) { m.hidden = true; }); });
+  function switchTab(which) {
+    document.querySelectorAll('.tab').forEach(function (x) { x.classList.toggle('is-active', x.getAttribute('data-tab') === which); });
+    ['board','containers','quotas'].forEach(function (k) { document.getElementById('panel-' + k).hidden = k !== which; });
+  }
   document.querySelectorAll('.tab').forEach(function (t) {
-    t.addEventListener('click', function () {
-      document.querySelectorAll('.tab').forEach(function (x) { x.classList.toggle('is-active', x === t); });
-      var which = t.getAttribute('data-tab');
-      ['board','containers','quotas'].forEach(function (k) { document.getElementById('panel-' + k).hidden = k !== which; });
-    });
+    t.addEventListener('click', function () { switchTab(t.getAttribute('data-tab')); });
   });
   document.getElementById('refresh').addEventListener('click', function () { load(false); });
   document.getElementById('signout').addEventListener('click', function () { YM.logout(); });
