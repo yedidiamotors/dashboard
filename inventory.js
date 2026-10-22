@@ -93,6 +93,9 @@
     document.getElementById('eyebrow').textContent =
       YM.roleHe(session.user && session.user.role);
 
+    var nb = document.getElementById('new-vehicle');
+    if (nb) nb.hidden = !(state.viewer && state.viewer.can_create);
+
     renderSideBox();
     renderFilters();
     renderRows();
@@ -301,6 +304,8 @@
 
   function bindCard(res) {
     var v = res.vehicle || {};
+    var eb = document.getElementById('v-edit');
+    if (eb) eb.addEventListener('click', function () { YM.vehicleForm.openEdit(res); });
     var up = document.getElementById('vdoc-up');
     if (up) up.addEventListener('click', function () {
       pickFile({ scope: 'vehicle', target_id: v.id, doc_type: document.getElementById('vdoc-type').value });
@@ -361,10 +366,15 @@
         (v.location ? '<span class="tag">' + E(v.location) + '</span>' : '') +
         (v.model_year ? '<span class="tag">' + E(v.model_year) + '</span>' : '') +
         '<span class="tag">' + E(v.days_in_stock) + ' ימים במלאי</span>' +
-      '</div></div>';
+      '</div>' +
+      (res.viewer && res.viewer.can_edit
+        ? '<div class="card-tools"><button class="btn-icon primary" type="button" id="v-edit">עריכת פרטי הרכב</button></div>'
+        : '') +
+      '</div>';
 
     h += section('זיהוי', [
       kv('מספר שלדה', v.vin, 'num'),
+      kv('מספר רישוי', v.license_plate_number, 'num'),
       kv('מספר הזמנה', v.order_number),
       kv('מספר לוט', v.stock_lot_number),
       kv('ריפוד', v.upholstery)
@@ -373,7 +383,7 @@
     h += specHtml(v);
 
     var feat = v.features || {};
-    h += section('רישוי ואבזור (מהגיליון)', [
+    h += section('רישוי ואבזור', [
       kv('תקן', feat.standard || v.standard_type),
       kv('מפתח ספייר', boolHe(v.has_spare_key)),
       kv('איתורן', boolHe(v.tracking_device_installed)),
@@ -389,6 +399,15 @@
       kv('קוד', v.levi_yitzhak_code),
       kv('מחיר', v.levi_yitzhak_price != null ? YM.nis(v.levi_yitzhak_price) : null, 'money')
     ]);
+
+    h += section('הערות', [
+      kv('הערות טיפול', v.handling_notes),
+      kv('הערות', v.misc_notes),
+      kv('הערת איתורן', v.tracking_note),
+      kv('אביזרים שסופקו', v.supplied_accessories)
+    ]);
+
+    h += YM.vehicleForm.locksHtml(v);
 
     // הסעיפים הבאים מופיעים רק אם השרת שלח אותם — כלומר רק אם יש הרשאה
     h += section('ספק ומיסוי יבוא', [
@@ -442,6 +461,24 @@
     if (b === null || b === undefined) return null;
     return b ? 'כן' : 'לא';
   }
+
+  /* ---------- עריכה ופתיחת רכב (vehicle-form.js) ---------- */
+  YM.vehicleForm.init({
+    session: session,
+    host: function () { return document.getElementById('card-body'); },
+    showModal: function () { document.getElementById('modal').hidden = false; },
+    makes: function () { return ((state.facets || {}).makes || []).map(function (m) { return m.name; }); },
+    showCard: function (res) {
+      cardRef = (res.vehicle && (res.vehicle.vin || res.vehicle.id)) || cardRef;
+      document.getElementById('card-body').innerHTML = cardHtml(res);
+      bindCard(res);
+    },
+    backToCard: function () { openCard(cardRef); },
+    reloadList: function () { load(true); },
+    toast: function (t) { notice(t, 'ok'); }
+  });
+  var newBtn = document.getElementById('new-vehicle');
+  if (newBtn) newBtn.addEventListener('click', function () { YM.vehicleForm.openCreate(); });
 
   /* ---------- אירועים ---------- */
   function closeCard() { document.getElementById('modal').hidden = true; YM.photos.close(); }

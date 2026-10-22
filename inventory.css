@@ -128,3 +128,56 @@
   .inv-row .inv-meta { display: block; }
   .kv { grid-template-columns: 1fr; }
 }
+
+/* ---------- עריכה ופתיחת רכב ---------- */
+.card-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.btn-icon.primary { border-color: var(--accent); color: var(--accent-soft); }
+.lock-chip { display: inline-flex; flex-direction: column; gap: 1px; border-color: rgba(226,180,87,.45) !important; }
+.lock-chip .m { font-size: 10.5px; color: var(--text-fainter); }
+
+.edit-h {
+  margin: 0 0 6px; font-family: Cinzel, Heebo, serif; font-size: 20px; font-weight: 400;
+  color: var(--text); padding-inline-end: 36px;
+}
+.vf-sub { margin: 0 0 8px; font-size: 12.5px; color: var(--text-faint); unicode-bidi: plaintext; }
+.vf-intro { margin-bottom: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; }
+
+.form { display: flex; flex-direction: column; gap: 14px; }
+.form .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.form .field.wide { grid-column: 1 / -1; }
+.form label { font-size: 12.5px; color: var(--text-faint); }
+.form input:not([type=checkbox]), .form select, .form textarea {
+  height: 42px; padding: 0 12px; border-radius: 6px; background: #101216;
+  border: 1px solid var(--border-input); color: var(--text-body); font-size: 14px; outline: none;
+  font-family: inherit; transition: border-color 120ms ease; width: 100%; box-sizing: border-box;
+}
+.form textarea { height: auto; min-height: 58px; padding: 10px 12px; resize: vertical; line-height: 1.5; }
+.form input:focus, .form select:focus, .form textarea:focus { border-color: var(--accent); }
+.form input[readonly] { opacity: .6; cursor: not-allowed; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hint { font-size: 11.5px; color: var(--text-fainter); line-height: 1.6; }
+
+.vf-group { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border-soft); }
+.vf-group:first-child { border-top: 0; padding-top: 0; }
+.vf-group h4 { margin: 0; font-size: 11.5px; letter-spacing: .08em; color: var(--text-fainter); font-weight: 400; }
+.vf-ticks { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.tick { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13px; color: var(--text-mid); cursor: pointer; }
+.tick input { width: 16px; height: 16px; accent-color: var(--accent); }
+.f-hint { font-size: 11px; color: var(--text-fainter-2); line-height: 1.5; }
+.f-lock { font-size: 11px; color: var(--warn); line-height: 1.6; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.f-lock .rel { display: inline-flex; align-items: center; gap: 4px; color: var(--text-mid); font-size: 11px; cursor: pointer; }
+.f-lock .rel input { width: 14px; height: 14px; accent-color: var(--accent); }
+.f-err { font-size: 11.5px; color: var(--accent-soft); }
+.field.has-err input, .field.has-err select, .field.has-err textarea { border-color: var(--accent); }
+.vf-tick { display: flex; flex-direction: column; gap: 3px; }
+.vf-tick.has-err .tick { color: var(--accent-soft); }
+#vf-msg:empty { display: none; }
+#vf-msg .banner { margin: 0 0 10px; }
+.vf-foot { position: sticky; bottom: -24px; background: var(--surface-card); padding: 12px 0 4px;
+           border-top: 1px solid var(--border-soft); }
+.vf-foot .modal-actions { margin-top: 0; }
+
+@media (max-width: 760px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .topbar .tools #new-vehicle { order: 3; }
+}
