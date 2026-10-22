@@ -198,6 +198,15 @@
 .timeline .ev-departure_detected .t, .timeline .ev-status .ic { color: var(--ok); border-color: rgba(127,192,138,.45); }
 .timeline .ev-eta_changed .ic { color: var(--accent-soft); border-color: var(--accent); }
 
+/* שלבי נמל — TaskYam */
+.port-steps { display: flex; gap: 4px; flex-wrap: wrap; font-size: 11.5px; }
+.port-steps span { padding: 3px 8px; border-radius: 4px; border: 1px dashed var(--border-soft); color: var(--text-fainter); }
+.port-steps span.done { border-style: solid; color: var(--ok); border-color: rgba(127,192,138,.35); }
+.port-steps small { color: var(--text-faint); font-size: 10.5px; }
+.port-line { font-size: 11.5px; color: var(--text-fainter); }
+.port-line.err { color: var(--warn); }
+.timeline .ev-port .ic { color: #7fb3e0; border-color: rgba(127,179,224,.5); }
+
 @media (max-width: 1180px) {
   .stages { grid-template-columns: repeat(3, 1fr); }
   .cont .kv { grid-template-columns: repeat(2, 1fr); }

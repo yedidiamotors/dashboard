@@ -342,6 +342,7 @@
       if (!c.container_number) flags.push('<span class="tag warn">ממתין למספר מכולה</span>');
       if (c.eta_overdue) flags.push('<span class="tag warn">ה-ETA עבר — לעדכן</span>');
       if (c.expected_unlinked) flags.push('<span class="tag warn">' + c.expected_unlinked + ' רכבים מהמסמכים עוד לא שובצו</span>');
+      if (c.port_last_error) flags.push('<span class="tag warn">שגיאה מול רשות הנמלים</span>');
       if (c.recent_warnings) flags.push('<span class="tag warn">' + c.recent_warnings + ' התראות</span>');
       var next = nextStep(c.status);
       var suggest = c.departure_suggested
@@ -354,7 +355,7 @@
         acts += '<button class="btn-icon" type="button" data-act="edit">פרטי מכולה</button>';
         if (next && !(next === 'at_sea' && c.departure_suggested)) acts += '<button class="btn-icon" type="button" data-act="advance" data-status="' + next + '">' + E(NEXT_LABEL[next]) + '</button>';
       }
-      var last = c.last_event ? '<div class="last-ev">עדכון אחרון: ' + E(c.last_event.title_he) + ' · ' + E(fmtDT(c.last_event.at)) + (c.last_event.source === 'email' ? ' · מהמייל' : '') + '</div>' : '';
+      var last = c.last_event ? '<div class="last-ev">עדכון אחרון: ' + E(c.last_event.title_he) + ' · ' + E(fmtDT(c.last_event.at)) + (c.last_event.source === 'email' ? ' · מהמייל' : c.last_event.source === 'port' ? ' · רשות הנמלים' : '') + '</div>' : '';
       return '<div class="cont" data-id="' + E(c.id) + '">' +
         '<div class="head"><span>' + (c.container_number ? '' : '<span class="num-l">' + (c.booking_number ? 'בוקינג' : 'שטר מטען') + '</span> ') +
           '<span class="num">' + E(c.container_number || c.booking_number || c.bl_number || '—') + '</span></span><span class="status-pill">' + E(c.status_he) + '</span></div>' +
@@ -365,6 +366,7 @@
           kv('בוקינג', c.container_number ? c.booking_number : null) + kv('שטר מטען', c.bl_number) +
           kv('טלקס רליס', c.telex_release ? 'התקבל' + (c.telex_release_at ? ' ' + fmtDate(c.telex_release_at) : '') : 'טרם') + kv('נפתחה', fmtDate(c.created_at)) + '</div>' +
         (flags.length ? '<div class="meta">' + flags.join('') + '</div>' : '') +
+        portStepsHtml(c) +
         '<div class="vehs">' + vehs.join('') + '</div>' + last +
         '<div class="actions">' + acts + '</div>' +
       '</div>';
@@ -392,7 +394,26 @@
   }
 
   /* ---------- מסך מעקב מלא ---------- */
-  var EV_ICON = { opened: '◎', booking: '⚓', document: '✉', status: '●', eta_changed: '⏱', departure_detected: '⚑', vehicle_linked: '+', vehicle_removed: '−', warning: '!', note: '✎' };
+  // שלבי הנמל מ-TaskYam (רשות הנמלים) — מהגעת האונייה ועד יציאה מהנמל
+  var PORT_STEPS = [
+    ['manifest', 'במצהר'], ['unloaded', 'נפרקה'], ['delivery_order', 'פקודת מסירה'], ['customs_check', 'בדיקת מכס'],
+    ['customs_release', 'שחרור מכס'], ['port_release', 'שחרור נמל'], ['exit', 'יצאה מהנמל']];
+  function portStepsHtml(c) {
+    var ms = c.port_milestones || {};
+    var any = PORT_STEPS.some(function (s) { return ms[s[0]]; });
+    if (!any) return '';
+    return '<div class="port-steps">' + PORT_STEPS.filter(function (s) { return s[0] !== 'customs_check' || ms.customs_check; }).map(function (s) {
+      var d = ms[s[0]];
+      return '<span class="' + (d ? 'done' : '') + '" title="' + E(d ? fmtDT(d) : 'טרם') + '">' + E(s[1]) + (d ? ' <small>' + E(fmtDate(d).slice(0, 5)) + '</small>' : '') + '</span>';
+    }).join('') + '</div>';
+  }
+  function portLine(c) {
+    if (c.port_last_error) return '<div class="port-line err">רשות הנמלים: ' + E(c.port_last_error) + '</div>';
+    if (c.port_last_check_at) return '<div class="port-line">נבדק מול רשות הנמלים (TaskYam) · ' + E(fmtDT(c.port_last_check_at)) + (c.port_name ? ' · ' + E(c.port_name) : '') + (c.manifest_number ? ' · מצהר ' + E(c.manifest_number) : '') + '</div>';
+    return '';
+  }
+
+  var EV_ICON = { port: '⚓', opened: '◎', booking: '⚓', document: '✉', status: '●', eta_changed: '⏱', departure_detected: '⚑', vehicle_linked: '+', vehicle_removed: '−', warning: '!', note: '✎' };
   var trackId = null;
 
   async function openTracking(id) {
@@ -422,7 +443,9 @@
     if (c.eta_overdue) alerts += '<div class="suggest warn">ה-ETA (' + E(fmtDate(c.eta)) + ') עבר והמכולה עדיין לא סומנה כהגיעה לנמל. לבדוק באתר חברת הספנות ולעדכן.</div>';
     if (!c.container_number) alerts += '<div class="suggest warn">עדיין אין מספר מכולה — הרכבים ישובצו אוטומטית כשיגיע מייל עם המספר, או שאפשר להזין אותו ב"פרטי מכולה".</div>';
 
-    var details = '<div class="kv tr-kv">' +
+    var portBlock = (portStepsHtml(c) || c.port_last_check_at || c.port_last_error)
+      ? '<h3>בנמל — רשות הנמלים</h3>' + (portStepsHtml(c) || '<div class="empty small">המכולה עוד לא מופיעה במערכת הנמל — תופיע כשהאונייה תדווח עליה.</div>') + portLine(c) : '';
+    var details = portBlock + '<div class="kv tr-kv">' +
       kv('מספר מכולה', c.container_number) + kv('בוקינג', c.booking_number) + kv('שטר מטען', c.bl_number) + kv('חברת ספנות', c.shipping_line) +
       kv('משלח', c.freight_forwarder) + kv('אונייה', c.vessel_name ? c.vessel_name + (c.voyage_number ? ' · ' + c.voyage_number : '') : null) +
       kv('נמל טעינה', c.port_of_loading) + kv('נמל יעד', c.port_of_discharge) +
@@ -460,7 +483,7 @@
       return '<li class="ev ev-' + E(e.type) + '"><span class="ic">' + E(EV_ICON[e.type] || '•') + '</span><div>' +
         '<div class="t">' + E(e.title_he) + '</div>' +
         (e.summary_he ? '<div class="sm">' + E(e.summary_he) + '</div>' : '') +
-        '<div class="m">' + E(fmtDT(e.at)) + (e.location ? ' · ' + E(e.location) : '') + ' · ' + E(e.source === 'email' ? 'מהמייל' : e.source === 'system' ? 'מערכת' : (e.by || 'ידני')) + '</div></div></li>';
+        '<div class="m">' + E(fmtDT(e.at)) + (e.location ? ' · ' + E(e.location) : '') + ' · ' + E(e.source === 'email' ? 'מהמייל' : e.source === 'port' ? 'רשות הנמלים' : e.source === 'system' ? 'מערכת' : (e.by || 'ידני')) + '</div></div></li>';
     }).join('');
     var addForm = can ? '<form class="tr-add" id="tr-add" novalidate><input name="title_he" placeholder="הוספת עדכון לציר הזמן — למשל: המשלח אישר טעינה ביום שני" maxlength="500"><input name="location" placeholder="מיקום (אופציונלי)"><button class="btn-primary small" type="submit">הוספה</button></form>' : '';
     var timeline = '<h3>ציר זמן</h3>' + addForm + (events ? '<ol class="timeline">' + events + '</ol>' : '<div class="empty small">אין עדיין אירועים.</div>');
