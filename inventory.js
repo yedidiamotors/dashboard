@@ -310,14 +310,14 @@
     if (up) up.addEventListener('click', function () {
       pickFile({ scope: 'vehicle', target_id: v.id, doc_type: document.getElementById('vdoc-type').value });
     });
-    loadPhotos(v.id);
+    loadPhotos(v.id, [v.title, v.vin_tail].filter(Boolean).join(' · '));
   }
 
   /* ---------- תמונות לאתר ----------
      המימוש עצמו יושב ב-photos.js ומשותף עם מסך הטרייד-אין. */
-  function loadPhotos(vehicleId) {
+  function loadPhotos(vehicleId, label) {
     YM.photos.open({
-      hostId: 'photos-sect', inputId: 'photo-input', token: session.token,
+      hostId: 'photos-sect', inputId: 'photo-input', token: session.token, label: label,
       onError: cardNotice,
       onToast: function (t) { notice(t, 'ok'); }
     }, { vehicle_id: vehicleId });

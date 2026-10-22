@@ -34,3 +34,63 @@
 .ph-b:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
 .ph-b:disabled { opacity: .3; cursor: default; }
 .ph-b.danger:hover { border-color: #b2483c; color: #e3877c; }
+
+/* ---------- התקדמות העלאה ---------- */
+.up-box {
+  margin: 12px 0 4px; padding: 12px 14px; border-radius: 8px;
+  border: 1px solid var(--border-chip); background: #101216;
+}
+.up-box.is-busy { border-color: rgba(200,16,46,.55); }
+.up-box.is-done { border-color: rgba(127,192,138,.5); }
+.up-box.is-fail { border-color: rgba(226,180,87,.55); }
+.up-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.up-head strong { font-size: 13px; font-weight: 500; color: var(--text); }
+.up-box.is-done .up-head strong, .up-dock.is-done .up-head strong { color: var(--ok); }
+.up-box.is-fail .up-head strong, .up-dock.is-fail .up-head strong { color: var(--warn); }
+.up-pct { font-size: 12.5px; color: var(--text-mid); font-variant-numeric: tabular-nums; }
+.up-bar {
+  display: block; height: 4px; border-radius: 2px; background: rgba(255,255,255,.08);
+  overflow: hidden; margin-top: 8px;
+}
+.up-bar.big { height: 6px; border-radius: 3px; }
+.up-bar b { display: block; height: 100%; background: var(--accent); transition: width 250ms ease; }
+.is-done .up-bar b { background: var(--ok); }
+.is-fail .up-bar b { background: var(--warn); }
+.up-warn { margin: 8px 0 0; font-size: 11.5px; color: var(--warn); line-height: 1.6; }
+.up-grid { margin-top: 10px; }
+
+.up-tile img, .up-tile .up-noimg { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0d10; }
+.up-tile { position: relative; }
+.up-tile .up-ov {
+  position: absolute; inset: 0 0 auto 0; aspect-ratio: 4 / 3;
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px;
+  background: rgba(10,10,11,.6); color: var(--text); font-size: 13px; font-weight: 500;
+  font-variant-numeric: tabular-nums; padding: 0 12px;
+}
+.up-tile .up-ov .up-bar { width: 80%; margin: 0; }
+.up-tile.st-wait .up-ov { color: var(--text-faint); font-weight: 400; background: rgba(10,10,11,.72); }
+.up-tile.st-proc .up-ov .up-bar b { animation: up-pulse 1.1s ease-in-out infinite; }
+.up-tile.st-ok .up-ov { background: rgba(10,10,11,.35); color: var(--ok); }
+.up-tile.st-fail { border-color: rgba(226,180,87,.6); }
+.up-tile.st-fail .up-ov { color: var(--warn); background: rgba(10,10,11,.75); }
+.up-tile figcaption { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; unicode-bidi: plaintext; }
+.up-tile.st-fail figcaption { color: var(--warn); white-space: normal; }
+@keyframes up-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* פס צף — כשהכרטיס סגור או כשעוברים לרכב אחר */
+.up-dock {
+  position: fixed; z-index: 80; inset-inline-start: 20px; bottom: 20px;
+  width: 320px; max-width: calc(100vw - 32px); box-sizing: border-box;
+  background: var(--surface-card); border: 1px solid var(--border-chip); border-radius: 10px;
+  padding: 12px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+.up-dock.is-busy { border-color: rgba(200,16,46,.6); }
+.up-dock.is-done { border-color: rgba(127,192,138,.55); }
+.up-dock.is-fail { border-color: rgba(226,180,87,.6); }
+.up-dock .up-sub { margin-top: 6px; font-size: 11.5px; color: var(--text-faint); unicode-bidi: plaintext; }
+.up-dock .up-acts { display: flex; gap: 6px; margin-top: 10px; }
+.up-x { background: none; border: 0; color: var(--text-dim); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.up-x:hover { color: var(--text); }
+@media (max-width: 760px) {
+  .up-dock { inset-inline: 16px; bottom: 16px; width: auto; }
+}

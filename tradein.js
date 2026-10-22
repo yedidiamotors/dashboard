@@ -290,6 +290,7 @@
 
     YM.photos.open({
       hostId: 'photos-sect', inputId: 'photo-input', token: session.token,
+      label: [t.title || [t.make, t.model].filter(Boolean).join(' '), t.license_plate_number].filter(Boolean).join(' · '),
       onError: function (x) { notice(x, 'err'); },
       onToast: function (x) { notice(x, 'ok'); }
     }, { trade_in_id: t.id });
