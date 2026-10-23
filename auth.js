@@ -130,6 +130,7 @@
     { label: 'סקירה כללית',       href: 'index.html' },
     { label: 'מלאי רכבים', href: 'inventory.html', perm: 'view_vehicle_files' },
     { label: 'הזמנות בדרך',        href: 'orders.html', perm: 'view_vehicle_files', notRoles: ['sales'] },
+    { label: 'ספקים ותשלומים',     href: 'suppliers.html', perm: 'manage_supplier_payments', roles: ['admin', 'import_manager'] },
     { label: 'לקוחות ועסקאות',     href: 'customers.html', perm: 'create_customer_deal' },
     { label: 'טרייד-אין',          href: 'tradein.html', perm: 'view_trade_in_vehicles' },
     { label: 'משתמשים והרשאות',    href: 'users.html', perm: 'manage_staff_users' },
@@ -185,7 +186,8 @@
     var s = getSession();
     var role = s && s.user ? s.user.role : '';
     host.innerHTML = NAV.map(function (n) {
-      if (n.perm && perms.indexOf(n.perm) === -1) return '';
+      // roles: גיבוי לסשנים שנפתחו לפני שההרשאה נוספה (רשימת ההרשאות נשמרת בכניסה)
+      if (n.perm && perms.indexOf(n.perm) === -1 && !(n.roles && n.roles.indexOf(role) > -1)) return '';
       if (n.notRoles && n.notRoles.indexOf(role) > -1) return '';
       var active = n.href && n.href === currentHref;
       var cls = 'nav-item' + (active ? ' is-active' : (n.soon ? ' is-soon' : ''));
