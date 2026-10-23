@@ -122,7 +122,8 @@
 .form .check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-body); cursor: pointer; }
 .form .check input { width: 16px; height: 16px; accent-color: var(--accent); }
 .form .sub { font-size: 13.5px; color: var(--text-faint); unicode-bidi: plaintext; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid2 { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+.form input, .form select { min-width: 0; }
 .modal-x {
   position: absolute; inset-inline-end: 18px; top: 16px; background: none; border: 0;
   color: var(--text-dim); font-size: 26px; line-height: 1; cursor: pointer; padding: 0 4px;
@@ -207,6 +208,21 @@
 .port-line.err { color: var(--warn); }
 .timeline .ev-port .ic { color: #7fb3e0; border-color: rgba(127,179,224,.5); }
 
+/* פרטי בוקינג וקאט-אופים */
+.size-chip { font-size: 11px; padding: 1px 7px; border-radius: 4px; border: 1px solid var(--border-chip); color: var(--text-mid); vertical-align: middle; font-family: Heebo, sans-serif; }
+.size-chip.dg { border-color: rgba(226,180,87,.5); color: var(--warn); }
+.h-note { font-size: 11px; color: var(--text-fainter); letter-spacing: 0; }
+.tr-kv.wide2 { grid-template-columns: 1fr 1fr; }
+.cutoffs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cut { border: 1px solid var(--border-chip); border-radius: 6px; padding: 7px 10px; display: flex; flex-direction: column; gap: 2px; }
+.cut .k { font-size: 11px; color: var(--text-fainter); }
+.cut .v { font-size: 13px; color: var(--text-body); direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+.cut .s { font-size: 11px; color: var(--text-fainter); min-height: 1em; }
+.cut.past { opacity: .6; }
+.cut.soon { border-color: rgba(226,180,87,.55); }
+.cut.soon .s { color: var(--warn); }
+.form .form-sec { margin: 6px 0 -4px; font-size: 12px; color: var(--text-fainter); font-weight: 400; letter-spacing: .04em; }
+
 @media (max-width: 1180px) {
   .stages { grid-template-columns: repeat(3, 1fr); }
   .cont .kv { grid-template-columns: repeat(2, 1fr); }
@@ -217,6 +233,8 @@
 @media (max-width: 760px) {
   .stages { grid-template-columns: repeat(2, 1fr); }
   .tr-kv { grid-template-columns: 1fr 1fr; }
+  .tr-kv.wide2 { grid-template-columns: 1fr; }
+  .cutoffs { grid-template-columns: 1fr 1fr; }
   .tr-vehs { grid-template-columns: 1fr; }
   .tr-add { grid-template-columns: 1fr; }
   .veh { grid-template-columns: 1fr; }

@@ -147,7 +147,7 @@
 
 <!-- מכולה -->
 <div class="modal" id="container-modal" hidden>
-  <div class="modal-box" role="dialog" aria-modal="true">
+  <div class="modal-box wide" role="dialog" aria-modal="true">
     <button class="modal-x" type="button" data-close="container-modal" aria-label="סגירה">×</button>
     <h2 id="container-title">מכולה</h2>
     <form id="container-form" class="form" novalidate>
@@ -167,6 +167,26 @@
         <div class="field"><label for="c-eta">ETA (הגעה משוערת)</label><input id="c-eta" name="eta" type="date"></div>
         <div class="field"><label class="check" style="margin-top:26px"><input type="checkbox" name="telex_release"> טלקס רליס התקבל</label></div>
       </div>
+      <h3 class="form-sec">פרטי בוקינג</h3>
+      <div class="grid2">
+        <div class="field"><label for="c-size">גודל מכולה</label><select id="c-size" name="size"><option value="40HC">40HC — 40 רגל גבוהה</option><option value="40DV">40DV — 40 רגל רגילה</option><option value="45HC">45HC — 45 רגל גבוהה</option><option value="20DV">20DV — 20 רגל רגילה</option><option value="20HC">20HC — 20 רגל גבוהה</option></select></div>
+        <div class="field"><label for="c-cap">קיבולת (רכבים)</label><input id="c-cap" name="capacity" inputmode="numeric" dir="ltr"></div>
+        <div class="field"><label for="c-seal">מספר חותם (Seal)</label><input id="c-seal" name="seal_number" dir="ltr"></div>
+        <div class="field"><label for="c-dg">חומרים מסוכנים (DG)</label><select id="c-dg" name="dangerous_goods"><option value="">לא ידוע</option><option value="true">כן</option><option value="false">לא</option></select></div>
+        <div class="field"><label for="c-shipper">לקוח בבוקינג</label><input id="c-shipper" name="shipper_name" dir="ltr"></div>
+        <div class="field"><label for="c-file">תיק אצל המשלח</label><input id="c-file" name="forwarder_file_number" dir="ltr"></div>
+        <div class="field"><label for="c-bdate">תאריך בוקינג</label><input id="c-bdate" name="booking_date" type="date"></div>
+        <div class="field"><label for="c-weight">משקל כולל (ק"ג)</label><input id="c-weight" name="gross_weight_kg" inputmode="numeric" dir="ltr"></div>
+      </div>
+      <h3 class="form-sec">קאט-אופ <span class="h-note">— בשעון נמל הטעינה, כפי שכתוב בבוקינג</span></h3>
+      <div class="grid2">
+        <div class="field"><label for="c-dgc">חומ"ס (DG)</label><input id="c-dgc" name="dg_cutoff" type="datetime-local"></div>
+        <div class="field"><label for="c-sic">מסמכים (SI)</label><input id="c-sic" name="si_cutoff" type="datetime-local"></div>
+        <div class="field"><label for="c-vgm">VGM</label><input id="c-vgm" name="vgm_cutoff" type="datetime-local"></div>
+        <div class="field"><label for="c-cgc">מטען (כניסה לנמל)</label><input id="c-cgc" name="cargo_cutoff" type="datetime-local"></div>
+      </div>
+      <div class="field"><label for="c-empty">איסוף מכולה ריקה</label><input id="c-empty" name="empty_pickup" dir="ltr"></div>
+      <div class="field"><label for="c-full">החזרת מכולה מלאה</label><input id="c-full" name="full_return" dir="ltr"></div>
       <div class="field"><label for="c-notes">הערות</label><input id="c-notes" name="notes"></div>
       <div class="modal-actions">
         <button class="btn-primary" type="submit">שמירה</button>

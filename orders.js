@@ -320,6 +320,23 @@
       : null;
     return fmtDate(c.eta) + (rel ? ' · ' + rel : '');
   }
+  var SIZE_HE = { '20DV': "20' רגילה", '20HC': "20' גבוהה", '40DV': "40' רגילה", '40HC': "40' גבוהה", '45HC': "45' גבוהה" };
+  function sizeText(c) { return c.size ? '\u2066' + c.size + '\u2069' + (SIZE_HE[c.size] ? ' — ' + SIZE_HE[c.size].replace(/^(\d+)'/, '$1 רגל') : '') + ' · ' + c.capacity + ' רכבים' : null; }
+  // קאט-אופ נשמר בשעון נמל הטעינה (בלי אזור זמן) — מציגים כפי שכתוב בבוקינג
+  function lts(t) { if (!t) return null; var m = String(t).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/); return m ? m[3] + '.' + m[2] + '.' + m[1] + ' ' + m[4] + ':' + m[5] : t; }
+  function ltsDate(t) { var m = t && String(t).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/); return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5]) : null; }
+  var CUTOFFS = [['dg_cutoff', 'קאט-אופ חומ"ס (DG)'], ['si_cutoff', 'קאט-אופ מסמכים (SI)'], ['vgm_cutoff', 'קאט-אופ VGM'], ['cargo_cutoff', 'קאט-אופ מטען (כניסה לנמל)']];
+  // הקאט-אופ הקרוב שעוד לא עבר — רק כשהמכולה עוד לא יצאה
+  function nextCutoff(c) {
+    if (c.status !== 'pending') return null;
+    var now = new Date(), best = null;
+    CUTOFFS.forEach(function (k) { var d = ltsDate(c[k[0]]); if (d && d > now && (!best || d < best.d)) best = { d: d, label: k[1], raw: c[k[0]] }; });
+    if (!best) return null;
+    best.hours = Math.round((best.d - now) / 3600000);
+    return best;
+  }
+  function kg(n) { return n ? Number(n).toLocaleString('en-US') + ' ק"ג' : null; }
+
   function routeText(c) {
     if (!c.port_of_loading && !c.port_of_discharge) return null;
     // הסדר הוא תמיד טעינה ואחריה יעד; החץ נבחר לפי כיוון הכתב של שמות הנמלים
@@ -358,13 +375,15 @@
       var last = c.last_event ? '<div class="last-ev">עדכון אחרון: ' + E(c.last_event.title_he) + ' · ' + E(fmtDT(c.last_event.at)) + (c.last_event.source === 'email' ? ' · מהמייל' : c.last_event.source === 'port' ? ' · רשות הנמלים' : '') + '</div>' : '';
       return '<div class="cont" data-id="' + E(c.id) + '">' +
         '<div class="head"><span>' + (c.container_number ? '' : '<span class="num-l">' + (c.booking_number ? 'בוקינג' : 'שטר מטען') + '</span> ') +
-          '<span class="num">' + E(c.container_number || c.booking_number || c.bl_number || '—') + '</span></span><span class="status-pill">' + E(c.status_he) + '</span></div>' +
+          '<span class="num">' + E(c.container_number || c.booking_number || c.bl_number || '—') + '</span>' +
+          (c.size ? ' <span class="size-chip">' + E(c.size) + '</span>' : '') + (c.dangerous_goods ? ' <span class="size-chip dg" title="מסומן בבוקינג כחומרים מסוכנים (Dangerous Goods)">חומ"ס</span>' : '') +
+          '</span><span class="status-pill">' + E(c.status_he) + '</span></div>' +
         '<div class="steps">' + stepsHtml(c.status) + '</div>' +
-        suggest +
+        suggest + cutoffAlert(c) +
         '<div class="kv">' + kv('ETA', etaText(c)) + kv('אונייה', c.vessel_name ? c.vessel_name + (c.voyage_number ? ' · ' + c.voyage_number : '') : null) +
           kv('חברת ספנות', c.shipping_line) + kv('מסלול', routeText(c)) +
           kv('בוקינג', c.container_number ? c.booking_number : null) + kv('שטר מטען', c.bl_number) +
-          kv('טלקס רליס', c.telex_release ? 'התקבל' + (c.telex_release_at ? ' ' + fmtDate(c.telex_release_at) : '') : 'טרם') + kv('נפתחה', fmtDate(c.created_at)) + '</div>' +
+          kv('טלקס רליס', c.telex_release ? 'התקבל' + (c.telex_release_at ? ' ' + fmtDate(c.telex_release_at) : '') : 'טרם') + kv('גודל', sizeText(c)) + '</div>' +
         (flags.length ? '<div class="meta">' + flags.join('') + '</div>' : '') +
         portStepsHtml(c) +
         '<div class="vehs">' + vehs.join('') + '</div>' + last +
@@ -383,6 +402,12 @@
         });
       });
     });
+  }
+  function cutoffAlert(c) {
+    var n = nextCutoff(c);
+    if (!n) return '';
+    var when = n.hours < 48 ? 'בעוד ' + n.hours + ' שעות' : 'בעוד ' + Math.round(n.hours / 24) + ' ימים';
+    return '<div class="suggest' + (n.hours < 72 ? ' warn' : '') + '">' + E(n.label) + ': ' + E(lts(n.raw)) + ' (שעון נמל הטעינה) · ' + E(when) + '</div>';
   }
   function kv(k, v) { return '<div><span class="k">' + E(k) + '</span><span class="v">' + E(v || '—') + '</span></div>'; }
 
@@ -441,18 +466,32 @@
     var alerts = '';
     if (c.departure_suggested) alerts += '<div class="suggest">לפי המסמכים המכולה עלתה על האונייה ב-' + E(fmtDate(c.departed_at)) + '.' + (can ? ' <button class="btn-icon primary" type="button" data-tr="advance" data-status="at_sea">לאשר "יצאה לדרך"</button>' : '') + '</div>';
     if (c.eta_overdue) alerts += '<div class="suggest warn">ה-ETA (' + E(fmtDate(c.eta)) + ') עבר והמכולה עדיין לא סומנה כהגיעה לנמל. לבדוק באתר חברת הספנות ולעדכן.</div>';
+    alerts += cutoffAlert(c);
     if (!c.container_number) alerts += '<div class="suggest warn">עדיין אין מספר מכולה — הרכבים ישובצו אוטומטית כשיגיע מייל עם המספר, או שאפשר להזין אותו ב"פרטי מכולה".</div>';
 
     var portBlock = (portStepsHtml(c) || c.port_last_check_at || c.port_last_error)
       ? '<h3>בנמל — רשות הנמלים</h3>' + (portStepsHtml(c) || '<div class="empty small">המכולה עוד לא מופיעה במערכת הנמל — תופיע כשהאונייה תדווח עליה.</div>') + portLine(c) : '';
-    var details = portBlock + '<div class="kv tr-kv">' +
+    var cutBlock = CUTOFFS.some(function (k) { return c[k[0]]; })
+      ? '<h3>מועדי קאט-אופ <span class="h-note">(שעון נמל הטעינה, כפי שבבוקינג)</span></h3><div class="cutoffs">' + CUTOFFS.filter(function (k) { return c[k[0]]; }).map(function (k) {
+          var d = ltsDate(c[k[0]]), past = d && d < new Date(), soon = d && !past && (d - new Date()) < 72 * 3600000;
+          return '<div class="cut' + (past ? ' past' : soon ? ' soon' : '') + '"><span class="k">' + E(k[1]) + '</span><span class="v">' + E(lts(c[k[0]])) + '</span><span class="s">' + (past ? 'עבר' : soon ? 'בקרוב' : '') + '</span></div>';
+        }).join('') + '</div>' : '';
+    var bookBlock = '<h3>פרטי בוקינג</h3><div class="kv tr-kv">' +
+      kv('גודל מכולה', sizeText(c)) + kv('חומרים מסוכנים', c.dangerous_goods === true ? 'כן (DG)' : c.dangerous_goods === false ? 'לא' : null) +
+      kv('לקוח בבוקינג', c.shipper_name) + kv('תאריך בוקינג', c.booking_date ? fmtDate(c.booking_date) : null) +
+      kv('תיק אצל המשלח', c.forwarder_file_number) + kv('מספר חותם (Seal)', c.seal_number) +
+      kv('משקל כולל', kg(c.gross_weight_kg)) + kv('סחורה', c.commodity) + '</div>' +
+      ((c.empty_pickup || c.full_return || c.place_of_receipt || c.place_of_delivery) ? '<div class="kv tr-kv wide2">' +
+        kv('איסוף מכולה ריקה', c.empty_pickup) + kv('החזרת מכולה מלאה', c.full_return) +
+        (c.place_of_receipt ? kv('מקום קבלה', c.place_of_receipt) : '') + (c.place_of_delivery ? kv('מקום מסירה', c.place_of_delivery) : '') + '</div>' : '');
+    var details = portBlock + cutBlock + '<h3>משלוח</h3><div class="kv tr-kv">' +
       kv('מספר מכולה', c.container_number) + kv('בוקינג', c.booking_number) + kv('שטר מטען', c.bl_number) + kv('חברת ספנות', c.shipping_line) +
       kv('משלח', c.freight_forwarder) + kv('אונייה', c.vessel_name ? c.vessel_name + (c.voyage_number ? ' · ' + c.voyage_number : '') : null) +
       kv('נמל טעינה', c.port_of_loading) + kv('נמל יעד', c.port_of_discharge) +
       kv('ETD', c.etd ? fmtDate(c.etd) : null) + kv('עלתה לאונייה', c.departed_at ? fmtDate(c.departed_at) : null) +
       kv('הגיעה לנמל', c.arrived_at ? fmtDate(c.arrived_at) : null) +
       kv('טלקס רליס', c.telex_release ? 'התקבל' + (c.telex_release_at ? ' ' + fmtDate(c.telex_release_at) : '') : 'טרם') + '</div>' +
-      (c.notes ? '<div class="tr-notes">' + E(c.notes) + '</div>' : '');
+      (c.notes ? '<div class="tr-notes">' + E(c.notes) + '</div>' : '') + bookBlock;
 
     var acts = (c.tracking_url ? '<a class="btn-icon" href="' + E(c.tracking_url) + '" target="_blank" rel="noopener">מעקב באתר חברת הספנות ↗</a>' : '');
     if (can) {
@@ -463,11 +502,12 @@
     var vehs = (r.vehicles || []).map(function (v) {
       var cu = v.customs && v.customs.total ? ' · מכס ' + v.customs.done + '/' + v.customs.total : '';
       return '<a class="tr-veh" href="inventory.html?ref=' + encodeURIComponent(v.vin || v.id) + '"><span class="t">' + E(v.title || '—') + '</span>' +
-        '<span class="s">' + E([v.model_year, v.color, v.vin ? 'VIN ' + v.vin : null].filter(Boolean).join(' · ')) + '</span>' +
+        '<span class="s">' + E([v.model_year, v.color, v.vin ? 'VIN ' + v.vin : null, kg((c.vehicle_weights || {})[v.vin])].filter(Boolean).join(' · ')) + '</span>' +
         '<span class="s">' + E(v.status_he) + E(cu) + (v.requested_customer_name ? ' · מבוקש: ' + E(v.requested_customer_name) : '') + '</span></a>';
     }).join('');
     var missing = (r.expected_unlinked || []).map(function (m) {
-      return '<div class="tr-miss"><span class="ltr">' + E(m.vin) + '</span> · ' + (m.vehicle_id ? E(m.title || '') + ' · ' + E(m.status_he || '') + ' — לשבץ מלוח הרכבים' : 'אין תיק רכב במערכת') + '</div>';
+      var w = kg((c.vehicle_weights || {})[m.vin]);
+      return '<div class="tr-miss"><span class="ltr">' + E(m.vin) + '</span>' + (w ? ' · ' + E(w) : '') + ' · ' + (m.vehicle_id ? E(m.title || '') + ' · ' + E(m.status_he || '') + ' — לשבץ מלוח הרכבים' : 'אין תיק רכב במערכת') + '</div>';
     }).join('');
     var vehBlock = '<h3>רכבים במכולה (' + (r.vehicles || []).length + '/' + c.capacity + ')</h3>' +
       (vehs ? '<div class="tr-vehs">' + vehs + '</div>' : '<div class="empty small">עדיין לא שובצו רכבים.</div>') +
@@ -509,11 +549,19 @@
 
   var cForm = document.getElementById('container-form');
   var C_FIELDS = ['container_number', 'booking_number', 'bl_number', 'freight_forwarder', 'vessel_name', 'shipping_line', 'voyage_number',
-                  'port_of_loading', 'port_of_discharge', 'etd', 'departed_at', 'eta', 'notes'];
+                  'port_of_loading', 'port_of_discharge', 'etd', 'departed_at', 'eta', 'notes',
+                  'size', 'capacity', 'seal_number', 'shipper_name', 'forwarder_file_number', 'booking_date', 'dangerous_goods',
+                  'dg_cutoff', 'si_cutoff', 'vgm_cutoff', 'cargo_cutoff', 'empty_pickup', 'full_return', 'gross_weight_kg'];
+  function formVal(k, v) {
+    if (v === null || v === undefined) return '';
+    if (/_cutoff$/.test(k)) return String(v).slice(0, 16).replace(' ', 'T');
+    if (k === 'dangerous_goods') return v === true ? 'true' : v === false ? 'false' : '';
+    return String(v);
+  }
   function openContainer(c) {
     cForm.reset(); cForm.container_id.value = c.id;
     document.getElementById('container-title').textContent = contName(c);
-    C_FIELDS.forEach(function (k) { if (cForm[k]) cForm[k].value = c[k] || ''; });
+    C_FIELDS.forEach(function (k) { if (cForm[k]) cForm[k].value = formVal(k, c[k]); });
     cForm.telex_release.checked = !!c.telex_release;
     show('container-modal');
   }
