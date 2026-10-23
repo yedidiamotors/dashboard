@@ -75,6 +75,7 @@
   .filter-group { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .filter-group::-webkit-scrollbar { display: none; }
   .filter-group .chip { flex: none; }
+  .filter-group .fg-l { flex: none; min-width: 0; }
 }
 
 @media (max-width: 380px) {

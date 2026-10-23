@@ -22,6 +22,12 @@
   var STD_HE = { canadian: 'קנדי', federal: 'פדרלי', other: 'אחר' };
 
   var data = null, filter = '', canManage = false;
+  // חיפוש וסינון — חיפוש חופשי בכל פרט, וסינונים לפי ערכים שקיימים בנתונים בפועל
+  var query = '';
+  var bf = { make: '', std: '', supplier: '', flag: '' };   // סינוני לוח הרכבים
+  var cf = { status: '', line: '', flag: '' };              // סינוני מכולות
+  try { var saved = JSON.parse(sessionStorage.getItem('ym_orders_filters') || 'null'); if (saved) { query = saved.q || ''; filter = saved.stage || ''; Object.assign(bf, saved.bf || {}); Object.assign(cf, saved.cf || {}); } } catch (e) {}
+  function saveFilters() { try { sessionStorage.setItem('ym_orders_filters', JSON.stringify({ q: query, stage: filter, bf: bf, cf: cf })); } catch (e) {} }
 
   load(true);
 
@@ -80,33 +86,173 @@
     setCount('count-containers', open.length);
     setCount('count-quotas', (data.quotas || []).length);
     document.getElementById('new-quota').hidden = !canManage;
-    renderStages(); renderBoard(); renderRecent(); renderContainers(); renderQuotas();
+    renderAll();
   }
+  function renderAll() {
+    renderBoardFilters(); renderStages(); renderBoard(); renderRecent();
+    renderContFilters(); renderContainers(); renderQuotas();
+    saveFilters();
+  }
+
+  /* ---------- חיפוש וסינון ---------- */
+  var searchEl = document.getElementById('search');
+  searchEl.value = query;
+  var searchTimer = null;
+  searchEl.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () { query = searchEl.value; if (data) renderAll(); }, 150);
+  });
+  searchEl.addEventListener('keydown', function (e) { if (e.key === 'Escape' && searchEl.value) { e.stopPropagation(); searchEl.value = ''; query = ''; renderAll(); } });
+
+  function fold(t) {
+    return String(t).toLowerCase()
+      .replace(/[\u0591-\u05C7]/g, '')            // ניקוד
+      .replace(/[״"׳'`]/g, '')
+      .replace(/[ךםןףץ]/g, function (c) { return { 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' }[c]; });
+  }
+  // כל ערך טקסט/מספר באובייקט (כולל מסמכים, רכבים במכולה וכו׳), כולל תאריכים בפורמט התצוגה
+  function haystack(obj, extra) {
+    var out = [];
+    (function walk(x, depth) {
+      if (x == null || depth > 4) return;
+      if (typeof x === 'string') {
+        out.push(x);
+        if (/^\d{4}-\d{2}-\d{2}/.test(x)) out.push(fmtDate(x));
+      } else if (typeof x === 'number') out.push(String(x));
+      else if (Array.isArray(x)) x.forEach(function (y) { walk(y, depth + 1); });
+      else if (typeof x === 'object') Object.keys(x).forEach(function (k) { if (!/(^id$|_id$|token|url$)/.test(k)) walk(x[k], depth + 1); });
+    })(obj, 0);
+    if (extra) out = out.concat(extra.filter(Boolean));
+    var h = fold(out.join(' \u0001 '));
+    return h + ' \u0001 ' + h.replace(/[\s\-\/.]/g, '');   // גם בלי רווחים/מקפים — VIN, מספר מכולה, בוקינג
+  }
+  function matchQuery(hay) {
+    var q = fold(query.trim());
+    if (!q) return true;
+    return q.split(/\s+/).every(function (t) { return hay.indexOf(t) > -1 || hay.indexOf(t.replace(/[\-\/.]/g, '')) > -1; });
+  }
+  function stageLabel(k) { var s = STAGES.filter(function (x) { return x.key === k; })[0]; return s ? s.label : k; }
+  function vehHay(v) {
+    if (!v.__hay) v.__hay = haystack(v, [stageLabel(v.stage), STD_HE[v.standard_type], v.standard_type ? 'תקן ' + STD_HE[v.standard_type] : null]);
+    return v.__hay;
+  }
+  function contHay(c) {
+    if (!c.__hay) c.__hay = haystack(c, [c.dangerous_goods ? 'חומ"ס חומרים מסוכנים' : null, c.telex_release ? 'טלקס רליס התקבל' : 'טלקס טרם',
+      (data.vehicles || []).filter(function (v) { return v.container_id === c.id; }).map(function (v) { return [v.vin, v.order_number, v.stock_lot_number, v.supplier_name, v.requested_customer_name].join(' '); }).join(' ')]);
+    return c.__hay;
+  }
+  function makeOf(v) { var t = String(v.title || '').trim(); return t ? t.split(/\s+/)[0] : ''; }
+
+  var VFLAGS = [
+    ['no_order', 'אין מספר הזמנה', function (v) { return !v.order_number; }],
+    ['no_std', 'אין תקן', function (v) { return !v.standard_type; }],
+    ['no_vin', 'VIN לא פוענח', function (v) { return !v.vin_decoded; }],
+    ['requested', 'מבוקש ללקוח', function (v) { return !!v.requested_customer_name; }],
+    ['no_docs', 'בלי מסמכים', function (v) { return !(v.document_list || []).length; }],
+    ['stuck', '30+ ימים בשלב', function (v) { return v.days_in_stage >= 30; }]
+  ];
+  var CFLAGS = [
+    ['late', 'ETA עבר', function (c) { return !!c.eta_overdue; }],
+    ['no_num', 'ממתינה למספר מכולה', function (c) { return !c.container_number; }],
+    ['unlinked', 'רכבים לא משובצים', function (c) { return !!c.expected_unlinked; }],
+    ['warn', 'התראות / שגיאת נמל', function (c) { return !!(c.recent_warnings || c.port_last_error); }],
+    ['no_telex', 'בלי טלקס רליס', function (c) { return !c.telex_release; }],
+    ['free', 'יש מקום פנוי', function (c) { return (c.vehicles || []).length < c.capacity; }]
+  ];
+
+  // הרכב עומד בכל הסינונים חוץ מ-skip (כדי שהמונים בכל קבוצה יראו כמה יישארו אם בוחרים בה)
+  function vehPass(v, skip) {
+    if (skip !== 'stage' && filter && v.stage !== filter) return false;
+    if (skip !== 'make' && bf.make && makeOf(v) !== bf.make) return false;
+    if (skip !== 'std' && bf.std && (v.standard_type || '') !== bf.std) return false;
+    if (skip !== 'supplier' && bf.supplier && (v.supplier_name || '') !== bf.supplier) return false;
+    if (skip !== 'flag' && bf.flag) { var f = VFLAGS.filter(function (x) { return x[0] === bf.flag; })[0]; if (f && !f[2](v)) return false; }
+    return matchQuery(vehHay(v));
+  }
+  function contPass(c, skip) {
+    if (skip !== 'status' && cf.status && c.status !== cf.status) return false;
+    if (skip !== 'line' && cf.line && (c.shipping_line || '') !== cf.line) return false;
+    if (skip !== 'flag' && cf.flag) { var f = CFLAGS.filter(function (x) { return x[0] === cf.flag; })[0]; if (f && !f[2](c)) return false; }
+    return matchQuery(contHay(c));
+  }
+
+  function chip(group, val, label, n, active) {
+    return '<button class="chip' + (active ? ' is-active' : '') + '" type="button" data-g="' + group + '" data-v="' + E(val) + '"' + (n === 0 && !active ? ' disabled style="opacity:.4;cursor:default"' : '') + '>' + E(label) + (n != null ? ' · ' + n : '') + '</button>';
+  }
+  function groupHtml(label, chips) { return chips.length ? '<div class="filter-group"><span class="fg-l">' + E(label) + '</span>' + chips.join('') + '</div>' : ''; }
+  function distinct(list, fn) {
+    var m = {}; list.forEach(function (x) { var k = fn(x); if (k) m[k] = 1; });
+    return Object.keys(m).sort(function (a, b) { return a.localeCompare(b, 'he'); });
+  }
+
+  function renderBoardFilters() {
+    var host = document.getElementById('board-filters');
+    var vs = data.vehicles || [];
+    if (!vs.length) { host.innerHTML = ''; return; }
+    function count(skip, test) { return vs.filter(function (v) { return vehPass(v, skip) && test(v); }).length; }
+    var makes = distinct(vs, makeOf), sups = distinct(vs, function (v) { return v.supplier_name; }), stds = distinct(vs, function (v) { return v.standard_type; });
+    var html = '';
+    if (makes.length > 1) html += groupHtml('יצרן', makes.map(function (m) { return chip('make', m, m, count('make', function (v) { return makeOf(v) === m; }), bf.make === m); }));
+    if (stds.length > 1) html += groupHtml('תקן', stds.map(function (k) { return chip('std', k, STD_HE[k] || k, count('std', function (v) { return v.standard_type === k; }), bf.std === k); }));
+    if (sups.length > 1) html += groupHtml('ספק', sups.map(function (k) { return chip('supplier', k, k, count('supplier', function (v) { return v.supplier_name === k; }), bf.supplier === k); }));
+    html += groupHtml('דורש טיפול', VFLAGS.map(function (f) { return chip('flag', f[0], f[1], count('flag', f[2]), bf.flag === f[0]); }));
+    host.innerHTML = html;
+    host.querySelectorAll('.chip').forEach(function (b) {
+      b.addEventListener('click', function () { var g = b.getAttribute('data-g'), v = b.getAttribute('data-v'); bf[g] = bf[g] === v ? '' : v; renderAll(); });
+    });
+  }
+  function renderContFilters() {
+    var host = document.getElementById('cont-filters');
+    var cs = data.containers || [];
+    if (!cs.length) { host.innerHTML = ''; return; }
+    function count(skip, test) { return cs.filter(function (c) { return contPass(c, skip) && test(c); }).length; }
+    var lines = distinct(cs, function (c) { return c.shipping_line; });
+    var html = groupHtml('סטטוס', CSTEPS.map(function (s) { return chip('status', s[0], s[1], count('status', function (c) { return c.status === s[0]; }), cf.status === s[0]); }));
+    if (lines.length > 1) html += groupHtml('חברת ספנות', lines.map(function (k) { return chip('line', k, k, count('line', function (c) { return c.shipping_line === k; }), cf.line === k); }));
+    html += groupHtml('דורש טיפול', CFLAGS.map(function (f) { return chip('flag', f[0], f[1], count('flag', f[2]), cf.flag === f[0]); }));
+    host.innerHTML = html;
+    host.querySelectorAll('.chip').forEach(function (b) {
+      b.addEventListener('click', function () { var g = b.getAttribute('data-g'), v = b.getAttribute('data-v'); cf[g] = cf[g] === v ? '' : v; renderAll(); });
+    });
+  }
+  function boardActive() { return !!(query.trim() || filter || bf.make || bf.std || bf.supplier || bf.flag); }
+  function contActive() { return !!(query.trim() || cf.status || cf.line || cf.flag); }
+  function resultLine(id, shown, total, active, noun, clearFn) {
+    var el = document.getElementById(id);
+    el.hidden = !active;
+    if (!active) return;
+    el.innerHTML = '<span>מוצגים ' + shown + ' מתוך ' + total + ' ' + noun + '</span><button class="clear" type="button">ניקוי חיפוש וסינון</button>';
+    el.querySelector('.clear').addEventListener('click', clearFn);
+  }
+  function clearBoard() { query = ''; searchEl.value = ''; filter = ''; bf = { make: '', std: '', supplier: '', flag: '' }; renderAll(); }
+  function clearCont() { query = ''; searchEl.value = ''; cf = { status: '', line: '', flag: '' }; renderAll(); }
   function setCount(id, n) { var el = document.getElementById(id); el.textContent = n; el.hidden = !n; }
 
   /* ---------- לוח ---------- */
   function renderStages() {
     var host = document.getElementById('stages');
     host.innerHTML = STAGES.map(function (s) {
-      var n = data.vehicles.filter(function (v) { return v.stage === s.key; }).length;
+      var n = data.vehicles.filter(function (v) { return v.stage === s.key && vehPass(v, 'stage'); }).length;
       return '<div class="stage' + (filter === s.key ? ' is-active' : '') + '" data-stage="' + s.key + '"><div class="n">' + n + '</div><div class="l">' + E(s.label) + '</div></div>';
     }).join('');
     host.querySelectorAll('.stage').forEach(function (el) {
-      el.addEventListener('click', function () { var k = el.getAttribute('data-stage'); filter = filter === k ? '' : k; renderStages(); renderBoard(); });
+      el.addEventListener('click', function () { var k = el.getAttribute('data-stage'); filter = filter === k ? '' : k; renderAll(); });
     });
   }
 
   function renderBoard() {
     var host = document.getElementById('board');
     var groups = STAGES.filter(function (s) { return !filter || s.key === filter; });
-    var any = false;
+    var any = false, shown = 0;
     host.innerHTML = groups.map(function (s) {
-      var list = data.vehicles.filter(function (v) { return v.stage === s.key; });
+      var list = data.vehicles.filter(function (v) { return v.stage === s.key && vehPass(v); });
+      shown += list.length;
       if (!list.length) return '';
       any = true;
       return '<div class="group"><h3>' + E(s.label) + ' <span class="tag">' + list.length + '</span></h3>' + list.map(vehHtml).join('') + '</div>';
     }).join('');
-    if (!any) host.innerHTML = '<div class="empty">' + (filter ? 'אין רכבים בשלב הזה.' : 'אין כרגע רכבים בתהליך יבוא. תיק חדש נפתח אוטומטית ממייל של יאיר או מתמונת מדבקה בוואטסאפ.') + '</div>';
+    resultLine('board-result', shown, data.vehicles.length, boardActive(), 'רכבים', clearBoard);
+    if (!any) host.innerHTML = '<div class="empty">' + (data.vehicles.length && boardActive() ? 'לא נמצאו רכבים שמתאימים לחיפוש ולסינון.' : filter ? 'אין רכבים בשלב הזה.' : 'אין כרגע רכבים בתהליך יבוא. תיק חדש נפתח אוטומטית ממייל של יאיר או מתמונת מדבקה בוואטסאפ.') + '</div>';
     bindBoard();
   }
 
@@ -183,7 +329,7 @@
 
   function renderRecent() {
     var card = document.getElementById('recent-card');
-    var list = data.recent || [];
+    var list = (data.recent || []).filter(function (r) { return matchQuery(r.__hay || (r.__hay = haystack(r))); });
     card.hidden = !list.length;
     document.getElementById('recent-count').textContent = list.length + ' ב-30 הימים האחרונים';
     document.getElementById('recent').innerHTML = list.map(function (r) {
@@ -346,7 +492,10 @@
 
   function renderContainers() {
     var host = document.getElementById('containers');
-    var list = data.containers || [];
+    var all = data.containers || [];
+    var list = all.filter(function (c) { return contPass(c); });
+    resultLine('cont-result', list.length, all.length, contActive() && all.length > 0, 'מכולות', clearCont);
+    if (all.length && !list.length) { host.innerHTML = '<div class="empty">לא נמצאו מכולות שמתאימות לחיפוש ולסינון.</div>'; return; }
     if (!list.length) {
       host.innerHTML = '<div class="empty">אין מכולות במעקב. מכולה נפתחת אוטומטית כשיאיר שולח למייל אישור בוקינג או שטר מטען, או ידנית בשיבוץ רכב למכולה (בלוח הרכבים).</div>';
       return;
@@ -576,7 +725,9 @@
   /* ---------- מכסות ---------- */
   function renderQuotas() {
     var host = document.getElementById('quotas');
-    var list = data.quotas || [];
+    var all = data.quotas || [];
+    var list = all.filter(function (q) { return matchQuery(q.__hay || (q.__hay = haystack(q, [STD_HE[q.standard_type]]))); });
+    if (all.length && !list.length) { host.innerHTML = '<div class="empty">לא נמצאו מכסות שמתאימות לחיפוש.</div>'; return; }
     if (!list.length) { host.innerHTML = '<div class="empty">אין מכסות רישיון יבוא עדיין.' + (canManage ? ' הוסיפו את המכסה המאושרת הראשונה כדי לאפשר שיבוץ למכולות.' : '') + '</div>'; return; }
     host.innerHTML = list.map(function (q) {
       var exhausted = q.remaining_quantity <= 0;

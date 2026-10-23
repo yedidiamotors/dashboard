@@ -12,6 +12,12 @@
 .tab.is-active::after { content: ''; position: absolute; inset-inline: 10px; bottom: -1px; height: 2px; background: var(--accent); }
 .tab-count { font-size: 11px; background: var(--chip-bg); border: 1px solid var(--border-chip); color: var(--text-mid); border-radius: 999px; padding: 1px 7px; }
 .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+#board-filters, #cont-filters { flex-direction: column; gap: 6px; margin-bottom: 10px; }
+#board-filters:empty, #cont-filters:empty { display: none; }
+.filter-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-width: 0; max-width: 100%; }
+.filter-group .fg-l { font-size: 11px; color: var(--text-fainter); min-width: 52px; }
+.result-line { margin: 10px 0 0; font-size: 12.5px; color: var(--text-faint); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.result-line .clear { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-size: 12.5px; text-decoration: underline; }
 .hint { font-size: 11.5px; color: var(--text-fainter); line-height: 1.5; }
 
 /* שלבים */
