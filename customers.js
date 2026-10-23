@@ -19,10 +19,12 @@
   var DEAL_DOCS = [
     ['memorandum_of_understanding', 'זיכרון דברים'], ['purchase_agreement', 'הסכם רכישה'],
     ['financing_agreement', 'הסכם מימון'], ['trade_in_agreement', 'הסכם טרייד-אין'],
-    ['signed_order_form', 'טופס הזמנה חתום'], ['other', 'אחר']
+    ['signed_order_form', 'טופס הזמנה חתום'], ['vehicle_license_copy', 'צילום רישיון רכב'],
+    ['power_of_attorney', 'ייפוי כוח'], ['other', 'אחר']
   ];
   var CUST_DOCS = [['id_card', 'תעודת זהות'], ['drivers_license', 'רישיון נהיגה'], ['company_registration', 'תעודת התאגדות'],
-                   ['power_of_attorney', 'ייפוי כוח'], ['other', 'אחר']];
+                   ['power_of_attorney', 'ייפוי כוח'], ['invoice_details', 'פרטים לחשבונית'],
+                   ['company_shareholders_approval', 'אישור בעלי מניות ומורשה חתימה'], ['other', 'אחר']];
   var LEAD_STATUSES = [['new', 'חדש'], ['contacted', 'נוצר קשר'], ['converted', 'הפך ללקוח'], ['closed', 'נסגר'], ['spam', 'ספאם']];
   var leads = { rows: [], counts: {}, filter: '', loaded: false };
   var DEAL_STATUSES = [['open', 'פתוחה'], ['pending_signatures', 'ממתינה לחתימות'], ['completed', 'הושלמה'], ['cancelled', 'בוטלה']];
@@ -899,12 +901,15 @@
     document.getElementById('apv-body').scrollTop = 0;
   }
 
-  /* ---------- בדיקת תעודות מזהות (OCR מול הכרטיס) ---------- */
-  var FIELD_HE = { id: 'מספר זהות', name: 'שם', address: 'כתובת' };
+  /* ---------- בדיקת מסמכים (סריקה מול הלקוח / העסקה / ההזמנה) ----------
+     כל מסמך לקוח ועסקה נסרק: תעודות מזהות, פרטים לחשבונית, הסכמים, ייפוי כוח,
+     אישור בעלי מניות ורישיון רכב. ההשוואה עצמה ב-Supabase (id_check_register / doc_check_register). */
+  var FIELD_HE = { id: 'מספר זהות', name: 'שם', address: 'כתובת', invoice_email: 'מייל לחשבונית', company_name: 'שם החברה', company_reg_number: 'ח.פ' };
+  var APPLY_FIELDS = ['id', 'name', 'address', 'invoice_email', 'company_name', 'company_reg_number'];
   function idChecksHtml(list) {
     if (!list.length) return '';
     var open = list.filter(function (k) { return !k.resolved && (k.status === 'mismatch' || k.status === 'unreadable' || k.status === 'error'); });
-    var h = '<div class="sect idchk"><h3>בדיקת תעודות מזהות' + (open.length ? ' <span class="idchk-count">' + open.length + ' לטיפול</span>' : '') + '</h3>';
+    var h = '<div class="sect idchk"><h3>בדיקת מסמכים' + (open.length ? ' <span class="idchk-count">' + open.length + ' לטיפול</span>' : '') + '</h3>';
     list.forEach(function (k) {
       var x = k.extracted || {};
       var who = [x.full_name_he || x.company_name || x.full_name_en, x.id_number || x.company_reg_number].filter(Boolean).join(' · ');
@@ -912,29 +917,29 @@
         (k.vehicle ? ' <span class="idchk-veh">' + E(k.vehicle) + '</span>' : '') +
         '<span class="idchk-when">' + fmtDT(k.checked_at || k.created_at) + '</span></div>';
       if (k.status === 'pending') {
-        h += '<div class="idchk-item pending">' + head + '<div class="idchk-line">סורקים את התעודה ומשווים לכרטיס…</div></div>';
+        h += '<div class="idchk-item pending">' + head + '<div class="idchk-line">סורקים את המסמך ומשווים ללקוח, לעסקה ולהזמנה…</div></div>';
         return;
       }
       if (k.status === 'match') {
-        h += '<div class="idchk-item ok">' + head + '<div class="idchk-line">✓ הפרטים בתעודה תואמים ל' + E(k.party_label || 'כרטיס') + '.' +
+        h += '<div class="idchk-item ok">' + head + '<div class="idchk-line">✓ ' + (k.is_id === false ? 'המסמך תואם ללקוח ולעסקה.' : 'הפרטים בתעודה תואמים ל' + E(k.party_label || 'כרטיס') + '.') +
           (x.expiry_date ? ' בתוקף עד ' + E(x.expiry_date.split('-').reverse().join('.')) + '.' : '') + '</div>' +
           flagsHtml(k.flags) + '</div>';
         return;
       }
       if (k.resolved) {
         h += '<div class="idchk-item done">' + head + '<div class="idchk-line">' +
-          (k.resolution === 'applied' ? 'הפרטים עודכנו מהתעודה (' + E(((k.applied && k.applied.fields) || []).map(function (f) { return FIELD_HE[f] || f; }).join(', ')) + ')'
+          (k.resolution === 'applied' ? 'הפרטים עודכנו מהמסמך (' + E(((k.applied && k.applied.fields) || []).map(function (f) { return FIELD_HE[f] || f; }).join(', ')) + ')'
                                        : 'נבדק — הפרטים בכרטיס נשארו כמו שהם') +
           (k.resolved_by ? ' · ' + E(k.resolved_by) : '') + ' · ' + fmtDT(k.resolved_at) + '</div></div>';
         return;
       }
       var mis = k.mismatches || [];
       var rows = mis.map(function (m) {
-        var canApply = m.doc && (m.field !== 'id' || /^\d{5,9}$/.test(String(m.doc)));
+        var canApply = m.doc && APPLY_FIELDS.indexOf(m.field) > -1 && (m.field !== 'id' || /^\d{5,9}$/.test(String(m.doc)));
         return '<label class="idchk-row sev-' + E(m.severity) + '">' +
           (canApply ? '<input type="checkbox" class="idchk-f" value="' + E(m.field) + '"' + (m.card ? '' : ' checked') + '>' : '<span class="idchk-nochk"></span>') +
           '<span class="k">' + E(m.label) + '</span>' +
-          '<span class="v">בתעודה: <b>' + E(m.doc || '—') + '</b></span>' +
+          '<span class="v">במסמך: <b>' + E(m.doc || '—') + '</b></span>' +
           '<span class="v">בכרטיס: <b>' + E(m.card || 'חסר') + '</b></span>' +
           '<span class="t">' + E(m.text || '') + '</span></label>';
       }).join('');
@@ -944,8 +949,8 @@
       }).join('') + '</select>' : '';
       h += '<div class="idchk-item warn" data-check="' + E(k.id) + '">' + head +
         (k.status === 'unreadable' || k.status === 'error'
-          ? '<div class="idchk-line">⚠ ' + E(k.status === 'error' ? ('הסריקה נכשלה' + (k.error ? ': ' + k.error : '')) : 'לא הצלחנו לקרוא את פרטי התעודה.') + ' כדאי לבדוק את הקובץ ידנית.</div>'
-          : '<div class="idchk-line">⚠ יש אי-התאמה בין התעודה ל' + E(k.party_label || 'כרטיס') + '. זה לא חוסם — רק לוודא שזה תקין (למשל תעודה של בן/בת הזוג).</div>') +
+          ? '<div class="idchk-line">⚠ ' + E(k.status === 'error' ? ('הסריקה נכשלה' + (k.error ? ': ' + k.error : '')) : 'לא הצלחנו לקרוא את המסמך.') + ' כדאי לבדוק את הקובץ ידנית.</div>'
+          : '<div class="idchk-line">⚠ ' + (k.is_id === false ? 'המסמך לא תואם לנתוני הלקוח / העסקה / ההזמנה.' : 'יש אי-התאמה בין התעודה ל' + E(k.party_label || 'כרטיס') + '.') + ' זה לא חוסם — רק לוודא שזה תקין (למשל תעודה של בן/בת הזוג).</div>') +
         (rows ? '<div class="idchk-rows">' + rows + '</div>' : '') + flagsHtml(k.flags) +
         '<div class="idchk-acts">' + tsel +
           (rows && mis.some(function (m) { return m.doc; }) ? '<button class="btn-icon primary idchk-apply" type="button">עדכון הפרטים שסומנו לכרטיס</button>' : '') +
@@ -965,7 +970,7 @@
       var ap = el.querySelector('.idchk-apply');
       if (ap) ap.addEventListener('click', async function () {
         var fields = Array.prototype.map.call(el.querySelectorAll('.idchk-f:checked'), function (c) { return c.value; });
-        if (!fields.length) { notice('סמנו אילו פרטים לעדכן מהתעודה.', 'err'); return; }
+        if (!fields.length) { notice('סמנו אילו פרטים לעדכן מהמסמך.', 'err'); return; }
         var tg = el.querySelector('.idchk-target');
         ap.disabled = true;
         await idCheckCall({ check_id: id, action: 'apply', fields: fields, target: tg ? tg.value : 'customer' }, true);
@@ -1783,8 +1788,8 @@
     if (r.ok) {
       var knownChecks = ((state.card && state.card.id_checks) || []).map(function (k) { return k.id; });
       openCard(state.cardId); load(false);
-      if (['id_card', 'drivers_license', 'company_registration'].indexOf(pendingUpload.doc_type) > -1) {
-        notice('התעודה הועלתה. סורקים אותה ומשווים לכרטיס — התוצאה תופיע בעוד כמה שניות.', 'ok');
+      if (pendingUpload.scope === 'customer' || pendingUpload.scope === 'deal') {
+        notice('המסמך הועלה. סורקים אותו ומשווים ללקוח, לעסקה ולהזמנה — התוצאה תופיע בעוד כמה שניות.', 'ok');
         watchIdChecks(state.cardId, knownChecks);
       }
     }
