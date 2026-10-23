@@ -351,6 +351,8 @@ button, input {
   margin-top: 7px; flex: none;
 }
 .alert-row .lines { display: flex; flex-direction: column; gap: 2px; }
+a.alert-link { color: inherit; text-decoration: none; }
+a.alert-link:hover .t { color: var(--accent-soft); }
 
 .empty {
   padding: 26px 22px; font-size: 13px; color: var(--text-faint); text-align: center; line-height: 1.7;

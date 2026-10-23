@@ -257,9 +257,12 @@
         side.push(card('דורש תשומת לב', '',
           (d.alerts || []).length
             ? '<div class="list">' + d.alerts.map(function (a) {
-                return '<div class="alert-row"><span class="dot"></span><div class="lines">' +
+                var inner = '<span class="dot"></span><div class="lines">' +
                   '<span class="t">' + E(a.title) + '</span>' +
-                  '<span class="s">' + E(a.detail) + '</span></div></div>';
+                  '<span class="s">' + E(a.detail) + '</span></div>';
+                return a.kind === 'file_checks'
+                  ? '<a class="alert-row alert-link" href="inventory.html?status=file_alert">' + inner + '</a>'
+                  : '<div class="alert-row">' + inner + '</div>';
               }).join('') + '</div>'
             : '<div class="empty small">אין כרגע פריטים שדורשים טיפול.</div>'));
       }

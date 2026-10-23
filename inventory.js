@@ -13,6 +13,10 @@
 
   var session = YM.getSession();
   if (!session) { location.replace('login.html'); return; }
+  (function () {
+    var st = new URLSearchParams(location.search).get('status');
+    if (st) state.status = st;
+  })();
 
   load(true);
 
@@ -176,7 +180,7 @@
       return '<div class="inv-row" data-ref="' + E(v.vin || v.id) + '">' +
         '<div class="thumb"><span>' + E(v.vin_tail || '—') + '</span></div>' +
         '<div class="names">' +
-          '<div class="model">' + E(v.title || '—') + '</div>' +
+          '<div class="model">' + E(v.title || '—') + fcFlag(v) + '</div>' +
           '<div class="trim">' + E(v.trim || v.color || '—') + '</div>' +
           '<div class="inv-meta">' + E(meta) + '</div>' +
         '</div>' +
@@ -312,6 +316,80 @@
       pickFile({ scope: 'vehicle', target_id: v.id, doc_type: document.getElementById('vdoc-type').value });
     });
     loadPhotos(v.id, [v.title, v.vin_tail].filter(Boolean).join(' · '));
+    bindFileChecks();
+  }
+
+  /* ---------- בדיקת התאמה של קבצים לרכב ----------
+     כל תמונה ומסמך בתיק נקראים אוטומטית (Gemini) ומושווים לתיק:
+     מספר שלדה, שלדה של רכב שבוטל והוחלף (מההערות), שלדה של תיק אחר, מספר חשבונית ויצרן.
+     השרת (vehicle_view → file_checks) מחזיר רק את מה שהצופה רשאי לראות. */
+  function fcFlag(v) {
+    var c = (v.file_checks && v.file_checks.counts) || {};
+    if (!c.open) return '';
+    return ' <span class="fc-flag' + (c.open_high ? ' high' : '') + '" title="קבצים בתיק שלא תואמים לרכב">⚠ ' + c.open + '</span>';
+  }
+
+  function fileChecksHtml(v, viewer) {
+    var fc = v.file_checks;
+    var c = (fc && fc.counts) || {};
+    if (!c.total) return '';
+    var items = fc.items || [];
+    var open = items.filter(function (i) { return !i.resolved_at; });
+    var summary = [
+      c.match ? c.match + ' תואמים' : '',
+      c.no_vin ? c.no_vin + ' בלי מספר שלדה גלוי (לא נמצאה סתירה)' : '',
+      c.pending ? c.pending + ' עדיין בבדיקה' : ''
+    ].filter(Boolean).join(' · ');
+    var h = '<div class="sect fc' + (open.length ? ' has-open' : '') + '" id="fc-sect"><h3>בדיקת התאמה של קבצים לרכב</h3>';
+    if (open.length) {
+      h += '<div class="fc-head">⚠ ' + (open.length === 1 ? 'קובץ אחד לא תואם' : open.length + ' קבצים לא תואמים') + ' לרכב הזה</div>';
+    } else if (!items.length) {
+      h += '<p class="note">לא נמצאה אי-התאמה. ' + E(summary) + '</p>';
+    }
+    h += items.map(function (i) { return fcItemHtml(i, viewer.can_edit); }).join('');
+    if (items.length && summary) h += '<p class="note">שאר הקבצים: ' + E(summary) + '</p>';
+    return h + '</div>';
+  }
+
+  function fcItemHtml(i, canEdit) {
+    var sev = i.severity || 'warn';
+    var lines = (i.mismatches || []).filter(function (m) { return m.severity === 'high' || m.severity === 'warn'; });
+    var info = (i.mismatches || []).filter(function (m) { return m.severity === 'info'; });
+    var name = E(i.file_he || 'קובץ') + (i.filename ? ' · ' + E(i.filename) : '');
+    var h = '<div class="fc-item sev-' + E(sev) + (i.resolved_at ? ' is-resolved' : '') + '">' +
+      '<div class="fc-top">' + (i.url ? '<a href="' + E(i.url) + '" target="_blank" rel="noopener">' + name + '</a>' : '<span>' + name + '</span>') +
+      '<span class="m">' + E(fmtDT(i.checked_at)) + '</span></div>' +
+      lines.map(function (m) { return '<div class="fc-text">' + E(m.text) + '</div>'; }).join('') +
+      info.map(function (m) { return '<div class="fc-info">' + E(m.text) + '</div>'; }).join('');
+    if (i.resolved_at) {
+      h += '<div class="fc-res">נסגר' + (i.resolved_by_name ? ' ע״י ' + E(i.resolved_by_name) : '') + ' · ' + E(fmtDT(i.resolved_at)) +
+        (i.resolution ? ' — ' + E(i.resolution) : '') + '</div>';
+      if (canEdit) h += '<div class="fc-tools"><button class="btn-icon fc-reopen" type="button" data-id="' + E(i.id) + '">פתיחה מחדש</button></div>';
+    } else if (canEdit) {
+      h += '<div class="fc-tools"><input class="fc-note" type="text" maxlength="300" placeholder="למה זה תקין? למשל: חשבונית מתוקנת בדרך / הקובץ הועבר לתיק הנכון" aria-label="סיבת הסגירה">' +
+        '<button class="btn-icon fc-resolve" type="button" data-id="' + E(i.id) + '">סגירת ההתראה</button></div>';
+    }
+    return h + '</div>';
+  }
+
+  function bindFileChecks() {
+    var sect = document.getElementById('fc-sect');
+    if (!sect) return;
+    sect.querySelectorAll('.fc-resolve, .fc-reopen').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var reopen = b.classList.contains('fc-reopen');
+        var noteEl = b.parentNode.querySelector('.fc-note');
+        var note = noteEl ? noteEl.value.trim() : '';
+        if (!reopen && !note) { noteEl.focus(); cardNotice('צריך לכתוב למה ההתראה נסגרת.'); return; }
+        b.disabled = true;
+        var r;
+        try {
+          r = await YM.api('/inventory/file-check', { token: session.token, check_id: b.getAttribute('data-id'), resolution: note, reopen: reopen });
+        } catch (err) { r = { ok: false, message_he: err.message }; }
+        if (r.ok === true) { openCard(cardRef); load(true); notice(reopen ? 'ההתראה נפתחה מחדש.' : 'ההתראה נסגרה.', 'ok'); }
+        else { b.disabled = false; cardNotice(r.message_he || 'הפעולה נכשלה.'); }
+      });
+    });
   }
 
   /* ---------- תמונות לאתר ----------
@@ -374,6 +452,7 @@
       '</div>';
 
     h += YM.share.html(v.share);
+    h += fileChecksHtml(v, res.viewer || {});
 
     h += section('זיהוי', [
       kv('מספר שלדה', v.vin, 'num'),

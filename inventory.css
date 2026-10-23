@@ -181,3 +181,23 @@
   .grid2 { grid-template-columns: 1fr; }
   .topbar .tools #new-vehicle { order: 3; }
 }
+
+/* בדיקת התאמה של קבצים לרכב */
+.fc-flag { font-size: 11px; color: var(--warn); border: 1px solid rgba(226,180,87,.45); border-radius: 4px; padding: 0 5px; margin-inline-start: 6px; white-space: nowrap; vertical-align: middle; }
+.fc-flag.high { color: var(--accent-soft); border-color: rgba(200,16,46,.5); background: var(--accent-tint); }
+.fc.has-open { border: 1px solid rgba(200,16,46,.4); background: var(--accent-tint); border-radius: 8px; padding: 12px 14px; }
+.fc-head { font-size: 14px; color: var(--accent-soft); font-weight: 500; margin-bottom: 10px; }
+.fc-item { border: 1px solid var(--border-chip); border-radius: 6px; padding: 9px 11px; margin-bottom: 8px; background: var(--surface-card); }
+.fc-item.sev-high { border-color: rgba(200,16,46,.55); }
+.fc-item.sev-warn { border-color: rgba(226,180,87,.45); }
+.fc-item.is-resolved { opacity: .7; border-color: var(--border-chip); }
+.fc-top { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; font-size: 12.5px; }
+.fc-top a { color: var(--text); text-decoration: none; unicode-bidi: plaintext; }
+.fc-top a:hover { color: var(--accent-soft); }
+.fc-top .m, .fc-res { font-size: 11px; color: var(--text-fainter); }
+.fc-text { font-size: 13px; color: var(--text-body); margin-top: 6px; line-height: 1.6; unicode-bidi: plaintext; text-align: right; }
+.sev-high .fc-text { color: #FFD4DB; }
+.fc-info { font-size: 11.5px; color: var(--text-faint); margin-top: 4px; unicode-bidi: plaintext; text-align: right; }
+.fc-res { margin-top: 6px; }
+.fc-tools { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.fc-tools .fc-note { flex: 1 1 220px; min-width: 0; height: 32px; font-size: 12.5px; padding: 0 9px; }
