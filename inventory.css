@@ -201,3 +201,17 @@
 .fc-res { margin-top: 6px; }
 .fc-tools { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .fc-tools .fc-note { flex: 1 1 220px; min-width: 0; height: 32px; font-size: 12.5px; padding: 0 9px; }
+
+/* טופסי IMR */
+.imr-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.imr-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; }
+.imr-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.imr-main .btn-icon { margin-inline-start: auto; text-decoration: none; }
+.imr-row .m { font-size: 11px; color: var(--text-fainter); margin-top: 4px; }
+.imr-st { font-size: 11px; border-radius: 4px; padding: 0 6px; border: 1px solid var(--border-chip); color: var(--text-faint); }
+.imr-st.ok { color: var(--ok); border-color: currentColor; }
+.imr-st.warn { color: var(--warn); border-color: rgba(226,180,87,.45); }
+.imr-st.bad { color: var(--accent-soft); border-color: rgba(200,16,46,.5); }
+.imr-rev { margin-top: 6px; font-size: 12px; }
+.imr-rev summary { cursor: pointer; color: var(--warn); }
+.imr-rev ul { margin: 6px 0 0; padding-inline-start: 18px; }

@@ -270,6 +270,48 @@
     return h;
   }
 
+  /* ---------- טופסי IMR (משרד התחבורה) ----------
+     מעלים לתיק את ה-IMR החתום של השנה; המערכת קוראת אותו וממלאת אוטומטית את טופס השנה הבאה
+     (על גבי הטופס המקורי של משרד התחבורה) לרכב שעדיין במלאי. רק למי שיש manage_imr_forms. */
+  function imrHtml(v) {
+    var m = v.imr;
+    if (!m) return '';
+    var forms = m.forms || [];
+    var h = '<div class="sect" id="imr-sect"><h3>טופסי IMR — משרד התחבורה</h3>';
+    if (!(m.templates || []).length) {
+      h += '<p class="note">עדיין לא נקלטו טפסי המקור של משרד התחבורה. מעלים אותם פעם אחת לתיקיית ה-Drive "IMR — טפסי משרד התחבורה (מקור)".</p>';
+    }
+    if (!forms.length) {
+      h += '<p class="note">לא הועלה טופס IMR חתום. אחרי ההעלאה המערכת קוראת אותו וממלאת את טופס השנה הבאה להחתמת היצרן.</p>';
+    } else {
+      h += '<div class="imr-list">' + forms.map(function (f) {
+        var cls = f.status === 'error' ? 'bad' : (f.status === 'needs_review' ? 'warn' : (f.status === 'ready' ? 'ok' : ''));
+        var title = 'IMR ' + (f.year || '—') + (f.variant_he ? ' · ' + f.variant_he : '') +
+          (f.origin === 'uploaded' ? ' · חתום' : ' · מולא אוטומטית');
+        var rev = f.review || [];
+        var r = '<div class="imr-row">' +
+          '<div class="imr-main"><b>' + E(title) + '</b> <span class="imr-st ' + cls + '">' + E(f.status_he || f.status) + '</span>' +
+          (f.download_url ? ' <a class="btn-icon' + (f.origin === 'generated' ? ' primary' : '') + '" href="' + E(f.download_url) + '" target="_blank" rel="noopener">' +
+            (f.origin === 'generated' ? 'הורדה להחתמה' : 'צפייה') + '</a>' : '') + '</div>';
+        if (f.error) r += '<div class="m">' + E(f.error) + '</div>';
+        if (f.notes_he && f.origin === 'uploaded') r += '<div class="m">' + E(f.notes_he) + '</div>';
+        if (rev.length) {
+          r += '<details class="imr-rev"><summary>' + rev.length + (f.origin === 'generated' ? ' סעיפים לבדיקה לפני השליחה ליצרן' : ' דברים לבדוק') + '</summary><ul>' +
+            rev.map(function (x) { return '<li>' + E([x.code, x.subject].filter(Boolean).join(' — ')) + (x.reason_he ? ' · <span class="m">' + E(x.reason_he) + '</span>' : '') + '</li>'; }).join('') +
+            '</ul></details>';
+        }
+        return r + '</div>';
+      }).join('') + '</div>';
+      if (forms.some(function (f) { return f.status === 'pending' || f.status === 'processing'; })) {
+        h += '<p class="note">הטופס בעבודה — הקריאה והמילוי לוקחים כמה דקות.</p>';
+      }
+    }
+    if (!m.eligible) h += '<p class="note">הרכב נמסר או נרשם — לא יופק טופס לשנה הבאה.</p>';
+    h += '<div class="doc-tools"><button class="btn-icon" type="button" id="imr-up">העלאת IMR חתום</button>' +
+         (forms.length ? ' <button class="btn-icon" type="button" id="imr-refresh">רענון</button>' : '') + '</div></div>';
+    return h;
+  }
+
   function docsHtml(v) {
     var docs = v.documents || [];
     var h = '<div class="sect"><h3>מסמכי התיק (' + docs.length + ')</h3>';
@@ -311,6 +353,10 @@
     YM.share.bind(document.getElementById('card-body'), v.share);
     var eb = document.getElementById('v-edit');
     if (eb) eb.addEventListener('click', function () { YM.vehicleForm.openEdit(res); });
+    var iu = document.getElementById('imr-up');
+    if (iu) iu.addEventListener('click', function () { pickFile({ scope: 'vehicle', target_id: v.id, doc_type: 'imr', btn: 'imr-up' }); });
+    var ir = document.getElementById('imr-refresh');
+    if (ir) ir.addEventListener('click', function () { openCard(cardRef); });
     var up = document.getElementById('vdoc-up');
     if (up) up.addEventListener('click', function () {
       pickFile({ scope: 'vehicle', target_id: v.id, doc_type: document.getElementById('vdoc-type').value });
@@ -410,7 +456,8 @@
     var f = fileInput.files && fileInput.files[0];
     if (!f || !pendingUpload) return;
     if (f.size > 15 * 1024 * 1024) { cardNotice('הקובץ גדול מדי (עד 15MB).'); return; }
-    var btn = document.getElementById('vdoc-up');
+    var btn = document.getElementById(pendingUpload.btn || 'vdoc-up');
+    var btnText = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'מעלה…'; }
     var fd = new FormData();
     fd.append('token', session.token);
@@ -425,7 +472,7 @@
     } catch (err) { r = { ok: false, message_he: 'אין תקשורת עם השרת.' }; }
     pendingUpload = null;
     if (r.ok) { openCard(cardRef); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'צירוף קובץ לתיק הרכב'; } cardNotice(r.message_he || 'ההעלאה נכשלה.'); }
+    else { if (btn) { btn.disabled = false; btn.textContent = btnText; } cardNotice(r.message_he || 'ההעלאה נכשלה.'); }
   });
   function cardNotice(text) {
     var body = document.getElementById('card-body');
@@ -514,6 +561,7 @@
     ]);
 
     h += '<div class="sect" id="photos-sect"><h3>תמונות לאתר</h3><p class="note">טוען…</p></div>';
+    h += imrHtml(v);
     h += docsHtml(v);
     h += sourcesHtml(v);
 
