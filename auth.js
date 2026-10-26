@@ -5,14 +5,37 @@
 (function (global) {
   'use strict';
 
-  var API_BASE = 'https://yedidiamotors.duckdns.org/webhook';
+  var DIRECT_BASE = 'https://yedidiamotors.duckdns.org/webhook';
+  // ממסר ב-Supabase — לדפדפנים/רשתות שחוסמים את duckdns (חוסמי פרסומות, DNS)
+  var RELAY_BASE = 'https://vpvhmulppwlojdivbbhk.supabase.co/functions/v1/api';
+  var BASE_KEY = 'ym_api_base';
+  var API_BASE = DIRECT_BASE;
+  try { if (localStorage.getItem(BASE_KEY) === 'relay') API_BASE = RELAY_BASE; } catch (e) {}
+
+  function setBase(base) {
+    API_BASE = base;
+    if (global.YM) global.YM.API_BASE = base;
+    try {
+      if (base === RELAY_BASE) localStorage.setItem(BASE_KEY, 'relay');
+      else localStorage.removeItem(BASE_KEY);
+    } catch (e) {}
+  }
   var STORAGE_KEY = 'ym_staff_session';
 
   function api(path, body) {
-    return fetch(API_BASE + path, {
+    var opts = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {})
+    };
+    // קודם הכתובת הנוכחית; אם נכשלת ברמת הרשת — מנסים את השנייה פעם אחת,
+    // ועוברים אליה (ונזכרים בה) רק אם היא ענתה. כך שום דבר שעובד היום לא משתנה.
+    var other = API_BASE === RELAY_BASE ? DIRECT_BASE : RELAY_BASE;
+    return fetch(API_BASE + path, opts).catch(function (err) {
+      return fetch(other + path, opts).then(function (r) {
+        setBase(other);
+        return r;
+      }, function () { throw err; });
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
         data.__status = r.status;
@@ -206,6 +229,8 @@
 
   global.YM = {
     API_BASE: API_BASE,
+    RELAY_BASE: RELAY_BASE,
+    DIRECT_BASE: DIRECT_BASE,
     api: api,
     looksLikePhone: looksLikePhone,
     saveSession: saveSession,
@@ -230,7 +255,7 @@
    duckdns בלשונית חדשה — ERR_BLOCKED_BY_CLIENT. לכן מושכים את המסמך
    ב-fetch (כמו כל קריאה אחרת לשרת) ופותחים אותו מהזיכרון.
    ------------------------------------------------------------ */
-(function () {
+(function (global) {
   'use strict';
   var DOC_PREFIX = 'https://yedidiamotors.duckdns.org/webhook/doc?';
   var VIEWABLE = /^(application\/pdf|image\/|text\/plain)/i;
@@ -269,7 +294,14 @@
     try { w = window.open('', '_blank'); } catch (e) {}
     msgPage(w, 'פותח את המסמך…', 'רק רגע.');
 
-    fetch(href, { method: 'GET', cache: 'no-store', credentials: 'omit' }).then(function (r) {
+    var relayHref = global.YM ? href.replace(global.YM.DIRECT_BASE, global.YM.RELAY_BASE) : href;
+    var first = (global.YM && global.YM.API_BASE === global.YM.RELAY_BASE) ? relayHref : href;
+    var getOpts = { method: 'GET', cache: 'no-store', credentials: 'omit' };
+    var second = first === relayHref ? href : relayHref;
+    fetch(first, getOpts).catch(function (err) {
+      if (second === first) throw err;
+      return fetch(second, getOpts);
+    }).then(function (r) {
       var type = r.headers.get('Content-Type') || '';
       if (!r.ok || /text\/html/i.test(type)) {
         return r.text().then(function (html) {
@@ -301,4 +333,4 @@
     e.preventDefault();
     openDoc(a.href);
   });
-})();
+})(window);
