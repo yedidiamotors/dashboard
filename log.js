@@ -14,6 +14,7 @@
   var KINDS = [
     { key: '',       label: 'הכל' },
     { key: 'login',  label: 'כניסות' },
+    { key: 'screen', label: 'זמן במסכים' },
     { key: 'view',   label: 'צפיות' },
     { key: 'action', label: 'פעולות' },
     { key: 'deal',   label: 'עסקאות' }
@@ -63,6 +64,7 @@
 
     renderDays();
     renderUsers(d.users || []);
+    renderScreens(d.screens || []);
     renderKinds();
     renderRows(d.events || []);
     renderSideBox(d);
@@ -96,16 +98,20 @@
     var host = document.getElementById('users-strip');
     var all = { id: '', name: 'כל המשתמשים', role: null,
       sessions: sum(users, 'sessions'), active_minutes: sum(users, 'active_minutes'),
+      online_minutes: sum(users, 'online_minutes'),
       views: sum(users, 'views'), actions: sum(users, 'actions'), last_seen_at: maxDate(users) };
     host.innerHTML = [all].concat(users).map(function (u) {
       var seen = seenText(u.last_seen_at);
+      if (seen.online && u.current_screen) seen.text = 'עכשיו ב' + screenHe(u.current_screen);
       return '<div class="user-card' + (state.userId === (u.id || '') ? ' is-active' : '') +
         '" data-id="' + E(u.id || '') + '" role="button" tabindex="0">' +
         '<div class="head"><div><div class="name">' + E(u.name) + '</div>' +
           (u.role ? '<div class="role">' + E(YM.roleHe(u.role)) + '</div>' : '') + '</div>' +
           '<div class="seen' + (seen.online ? ' online' : '') + '">' + E(seen.text) + '</div></div>' +
         '<div class="stats">' +
-          stat(u.sessions, 'כניסות') + stat(minutes(u.active_minutes), 'זמן פעיל') +
+          stat(u.sessions, 'כניסות') +
+          '<div class="stat" title="מחובר: ' + E(minutes(u.online_minutes)) + ' (מהכניסה ועד הפעילות האחרונה)">' +
+            '<b>' + E(minutes(u.active_minutes)) + '</b><span>זמן פעיל</span></div>' +
           stat(u.views, 'צפיות') + stat(u.actions, 'פעולות') +
         '</div></div>';
     }).join('');
@@ -147,6 +153,41 @@
     return ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][d.getDay()] + ' · ' + fmtDate(iso);
   }
 
+  var SCREEN_HE = {
+    index: 'סקירה כללית', inventory: 'מלאי רכבים', orders: 'הזמנות בדרך', suppliers: 'ספקים ותשלומים',
+    customers: 'לקוחות ועסקאות', tradein: 'טרייד-אין', users: 'משתמשים והרשאות', log: 'לוג משתמשים'
+  };
+  function screenHe(k) { return SCREEN_HE[k] || k; }
+  function dur(sec) {
+    sec = Math.max(0, Number(sec) || 0);
+    if (sec < 60) return sec + ' שנ׳';
+    var m = Math.round(sec / 60);
+    return minutes(m);
+  }
+
+  function renderScreens(list) {
+    var host = document.getElementById('screens');
+    if (!host) return;
+    var who = state.userId
+      ? ((state.data.users || []).filter(function (u) { return u.id === state.userId; })[0] || {}).name
+      : 'כל המשתמשים';
+    document.getElementById('screens-title').textContent = 'זמן לפי מסך · ' + (who || '');
+    if (!list.length) {
+      host.innerHTML = '<div class="empty">עוד אין נתוני זמן במסכים בטווח הזה. הנתונים נאספים מהיום (27.10.2026).</div>';
+      return;
+    }
+    var max = list.reduce(function (m, x) { return Math.max(m, x.active_seconds || 0); }, 0) || 1;
+    host.innerHTML = list.map(function (x) {
+      var pct = Math.round(100 * (x.active_seconds || 0) / max);
+      return '<div class="screen-row">' +
+        '<div class="sname">' + E(x.label || screenHe(x.screen)) + '</div>' +
+        '<div class="sbar" aria-hidden="true"><span style="width:' + pct + '%"></span></div>' +
+        '<div class="snum"><b>' + E(dur(x.active_seconds)) + '</b> פעיל' +
+          '<small>' + E(dur(x.open_seconds)) + ' פתוח · ' + E(x.visits) + ' כניסות</small></div>' +
+      '</div>';
+    }).join('');
+  }
+
   function renderRows(events) {
     var host = document.getElementById('rows');
     var list = events.filter(function (e) {
@@ -179,7 +220,7 @@
   }
 
   function kindHe(k) {
-    return { login: 'כניסה', logout: 'יציאה', view: 'צפייה', action: 'פעולה', deal: 'עסקה' }[k] || k;
+    return { login: 'כניסה', logout: 'יציאה', screen: 'זמן במסך', view: 'צפייה', action: 'פעולה', deal: 'עסקה' }[k] || k;
   }
 
   function details(e) {
@@ -188,9 +229,18 @@
       case 'login':
         return [
           d.duration_min != null ? 'משך: ' + minutes(d.duration_min) : null,
+          d.active_min ? 'פעיל: ' + minutes(d.active_min) : null,
           d.requests != null ? d.requests + ' בקשות' : null,
           d.ip ? '<span class="mono">' + E(d.ip) + '</span>' : null,
           d.user_agent ? E(ua(d.user_agent)) : null
+        ].filter(Boolean).join(' · ');
+      case 'screen':
+        return [
+          '<b>' + E(dur(d.active_seconds)) + '</b> פעיל',
+          E(dur(d.open_seconds)) + ' פתוח',
+          d.ended_at ? 'עד ' + YM.hhmm(new Date(d.ended_at)) : null,
+          d.live ? '<span class="live">עדיין במסך</span>' : null,
+          d.context ? E(d.context) : null
         ].filter(Boolean).join(' · ');
       case 'view':
         return d.vehicle ? '<span class="mono">' + E(d.vehicle) + '</span>' : '';

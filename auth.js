@@ -334,3 +334,78 @@
     openDoc(a.href);
   });
 })(window);
+
+/* ------------------------------------------------------------
+   זמן במסך — ללוג המשתמשים
+   סופר כמה זמן כל מסך היה פתוח, וכמה מתוכו היה "פעיל": הלשונית
+   גלויה והמשתמש הזיז עכבר / הקליד / גלל / נגע ב-60 השניות האחרונות.
+   נשלח כל דקה, ובסגירת המסך או מעבר ללשונית אחרת (sendBeacon).
+   השרת מגביל את הזמן לזמן שעבר בפועל — אי אפשר לנפח מהדפדפן.
+   ------------------------------------------------------------ */
+(function (global) {
+  'use strict';
+  if (!global.YM) return;
+  var page = (location.pathname.split('/').pop() || 'index.html').replace(/\.html?$/i, '') || 'index';
+  if (page === 'login' || page === 'portal') return;
+  var s = global.YM.getSession();
+  if (!s || !s.token) return;
+
+  function uuid() {
+    if (global.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+    });
+  }
+
+  var TICK = 5, IDLE_AFTER = 60000, SEND_EVERY = 60000;
+  var view = { id: uuid(), started: new Date().toISOString(), open: 0, active: 0, context: null };
+  var lastInput = Date.now(), lastSent = 0, stopped = false;
+
+  function poke() { lastInput = Date.now(); }
+  ['mousemove', 'mousedown', 'keydown', 'wheel', 'scroll', 'touchstart'].forEach(function (ev) {
+    global.addEventListener(ev, poke, { passive: true, capture: true });
+  });
+
+  function payload(final) {
+    var cur = global.YM.getSession();
+    return {
+      token: cur && cur.token, view_id: view.id, screen: page, context: view.context,
+      started_at: view.started, open_s: view.open, active_s: view.active, final: !!final
+    };
+  }
+
+  function send(final) {
+    if (stopped) return;
+    var p = payload(final);
+    if (!p.token) { stopped = true; return; }
+    lastSent = Date.now();
+    var url = global.YM.API_BASE + '/panel/screen-time';
+    // form-urlencoded: בקשה "פשוטה" בלי preflight — עובדת גם ב-sendBeacon בזמן סגירת הדף
+    var body = new URLSearchParams({ data: JSON.stringify(p) });
+    if (final && navigator.sendBeacon) {
+      try { if (navigator.sendBeacon(url, body)) return; } catch (e) {}
+    }
+    try {
+      fetch(url, { method: 'POST', body: body, keepalive: true, credentials: 'omit' })
+        .then(function (r) { if (r.status === 401) stopped = true; }, function () {});
+    } catch (e) {}
+  }
+
+  setInterval(function () {
+    if (document.visibilityState !== 'visible') return;
+    view.open += TICK;
+    if (Date.now() - lastInput < IDLE_AFTER) view.active += TICK;
+    if (Date.now() - lastSent >= SEND_EVERY) send(false);
+  }, TICK * 1000);
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') send(true);
+    else poke();
+  });
+  global.addEventListener('pagehide', function () { send(true); });
+
+  // מסכים עם תתי-מסכים (כרטיס לקוח, טאב לידים…) יכולים לדווח איפה בדיוק המשתמש
+  global.YM.setScreenContext = function (text) {
+    view.context = text ? String(text).slice(0, 120) : null;
+  };
+})(window);
