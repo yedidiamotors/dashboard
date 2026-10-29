@@ -22,17 +22,48 @@
   }
   var STORAGE_KEY = 'ym_staff_session';
 
+  // הגבלת זמן לבקשה: כניסה/יציאה מהירות (15 שניות), שאר הפעולות — עד 90 שניות
+  // (סריקת מסמכים והפקת טפסים לוקחות זמן). בלי זה, שרת שלא עונה משאיר את הכפתור על "שולח…" לנצח.
+  var AUTH_TIMEOUT_MS = 15000;
+  var DEFAULT_TIMEOUT_MS = 90000;
+
+  function timedFetch(url, opts, ms) {
+    if (typeof AbortController === 'undefined') return fetch(url, opts);
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, ms);
+    var o = {};
+    for (var k in opts) o[k] = opts[k];
+    o.signal = ctrl.signal;
+    return fetch(url, o).then(function (r) {
+      clearTimeout(timer);
+      return r;
+    }, function (err) {
+      clearTimeout(timer);
+      if (ctrl.signal.aborted) {
+        var e = new Error('timeout');
+        e.timeout = true;
+        throw e;
+      }
+      throw err;
+    });
+  }
+
   function api(path, body) {
     var opts = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {})
     };
+    var isAuth = path.indexOf('/staff-auth/') === 0;
+    var ms = isAuth ? AUTH_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
     // קודם הכתובת הנוכחית; אם נכשלת ברמת הרשת — מנסים את השנייה פעם אחת,
     // ועוברים אליה (ונזכרים בה) רק אם היא ענתה. כך שום דבר שעובד היום לא משתנה.
+    // אחרי timeout מנסים שוב רק בבקשות כניסה — בפעולה רגילה הבקשה אולי כבר בוצעה,
+    // וניסיון חוזר היה מבצע אותה פעמיים.
     var other = API_BASE === RELAY_BASE ? DIRECT_BASE : RELAY_BASE;
-    return fetch(API_BASE + path, opts).catch(function (err) {
-      return fetch(other + path, opts).then(function (r) {
+    return timedFetch(API_BASE + path, opts, ms).catch(function (err) {
+      if (err && err.timeout && !isAuth) throw err;
+      return timedFetch(other + path, opts, ms).then(function (r) {
         setBase(other);
         return r;
       }, function () { throw err; });
@@ -41,7 +72,10 @@
         data.__status = r.status;
         return data;
       });
-    }).catch(function () {
+    }).catch(function (err) {
+      if (err && err.timeout) {
+        throw new Error('השרת לא מגיב כרגע. נסו שוב בעוד כמה דקות.');
+      }
       throw new Error('אין תקשורת עם השרת. בדקו את החיבור לאינטרנט ונסו שוב.');
     });
   }
