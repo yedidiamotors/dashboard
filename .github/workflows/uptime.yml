@@ -1,0 +1,59 @@
+# ניטור זמינות של שרת n8n.
+# כל 10 דקות בודק את https://yedidiamotors.duckdns.org/healthz (3 ניסיונות).
+# אם השרת לא עונה — נפתח Issue "השרת לא עונה" (GitHub שולח מייל לבעלי הריפו).
+# כשהשרת חוזר — ה-Issue נסגר אוטומטית עם הערה.
+name: ניטור שרת n8n
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      URL: https://yedidiamotors.duckdns.org/healthz
+      TITLE: "🔴 שרת n8n לא עונה"
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check server
+        id: ping
+        run: |
+          ok=0
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$URL" || true)
+            echo "try $i: $code"
+            if [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 20
+          done
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Open issue when down
+        if: steps.ping.outputs.ok == '0'
+        run: |
+          open=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')
+          if [ -z "$open" ]; then
+            gh issue create --title "$TITLE" --body "$(printf 'הבדיקה האוטומטית לא הצליחה להגיע לשרת n8n.\n\n- כתובת: %s\n- קוד אחרון: %s\n- זמן (UTC): %s\n\nבדיקה ראשונה: קונסולת Oracle Cloud → Compute → Instances → n8n-server.\nתיעוד: מסמך הפרויקט claude/שחזור_שרת_n8n_29_10.md' "$URL" "${{ steps.ping.outputs.code }}" "$(date -u '+%F %T')")"
+          else
+            echo "issue #$open already open"
+          fi
+          exit 1
+
+      - name: Close issue when back up
+        if: steps.ping.outputs.ok == '1'
+        run: |
+          open=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            gh issue close "$open" --comment "✅ השרת חזר לענות ($(date -u '+%F %T') UTC)."
+          fi
