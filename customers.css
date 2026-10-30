@@ -48,6 +48,23 @@
 .lead-status.new { border-color: rgba(200,16,46,.55); color: var(--accent-soft); }
 .lead-status.contacted { border-color: rgba(226,180,87,.5); color: var(--warn); }
 .lead-status.converted { border-color: rgba(127,192,138,.45); color: var(--ok); }
+.lead-status.no_answer { border-color: rgba(226,180,87,.35); color: var(--text-mid); }
+.lead-status.meeting { border-color: rgba(120,160,255,.45); color: #9db7ff; }
+.lead-status.closed, .lead-status.spam { color: var(--text-fainter); }
+.lead-row .l-owner { font-size: 12px; color: var(--text-mid); margin-top: 4px; }
+.lead-row .l-owner.none { color: var(--text-fainter); }
+.lead-row.is-mine { box-shadow: inset 3px 0 0 rgba(120,160,255,.55); }
+.lead-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.lead-tools input.small, .lead-tools select.small {
+  height: 32px; font: inherit; font-size: 12.5px; padding: 0 8px; background: #101216; color: var(--text-body);
+  border: 1px solid var(--border-input); border-radius: 6px; color-scheme: dark;
+}
+.lead-tools input.small { flex: 1 1 220px; min-width: 0; max-width: 320px; }
+.lead-tools input.small::placeholder { color: var(--text-fainter); }
+@media (max-width: 760px) {
+  .lead-tools input.small { flex-basis: 100%; max-width: none; }
+  .lead-tools select.small { flex: 1 1 30%; min-width: 0; }
+}
 
 /* ---------- טפסים ---------- */
 .form { display: flex; flex-direction: column; gap: 15px; }

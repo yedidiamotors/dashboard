@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
-<link rel="stylesheet" href="customers.css?v=20261017c">
+<link rel="stylesheet" href="customers.css?v=20261030a">
 <link rel="stylesheet" href="mobile.css?v=20261017c">
 </head>
 <body>
@@ -74,11 +74,27 @@
 
     <section id="panel-leads" hidden>
       <div class="filter-bar">
-        <div class="filter-group" id="lead-filters" aria-label="סינון לידים"></div>
+        <div class="filter-group" id="lead-filters" aria-label="סינון לידים לפי סטטוס"></div>
+        <div class="lead-tools" aria-label="סינון ומיון לידים">
+          <input type="search" id="lead-q" class="small" placeholder="חיפוש: שם, טלפון, דגם, טופס…" aria-label="חיפוש לידים">
+          <select id="lead-src" class="small" aria-label="מקור">
+            <option value="">כל המקורות</option>
+            <option value="facebook_lead_ad">פייסבוק</option>
+            <option value="website_form">אתר</option>
+          </select>
+          <select id="lead-who" class="small" aria-label="אחראי"></select>
+          <select id="lead-sort" class="small" aria-label="מיון">
+            <option value="new">החדשים קודם</option>
+            <option value="old">הוותיקים קודם</option>
+            <option value="status">לפי סטטוס</option>
+            <option value="owner">לפי אחראי</option>
+          </select>
+          <button type="button" class="chip" id="lead-reset" hidden>נקה סינון</button>
+        </div>
       </div>
       <div class="card">
         <div class="thead lead-grid">
-          <div>ליד</div><div>טלפון</div><div>עניין</div><div>הגיע</div><div>סטטוס</div><div></div>
+          <div>ליד</div><div>טלפון</div><div>עניין</div><div>הגיע</div><div>סטטוס · אחראי</div><div></div>
         </div>
         <div id="lead-rows"><div class="empty">טוען…</div></div>
         <div class="card-foot" id="lead-foot"></div>
@@ -289,6 +305,6 @@
 <input type="file" id="file-input" hidden accept=".pdf,.jpg,.jpeg,.png,.heic,.webp,.doc,.docx">
 
 <script src="auth.js?v=20261029a"></script>
-<script src="customers.js?v=20261023g"></script>
+<script src="customers.js?v=20261030a"></script>
 </body>
 </html>

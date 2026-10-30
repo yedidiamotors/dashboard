@@ -25,8 +25,19 @@
   var CUST_DOCS = [['id_card', 'תעודת זהות'], ['drivers_license', 'רישיון נהיגה'], ['company_registration', 'תעודת התאגדות'],
                    ['power_of_attorney', 'ייפוי כוח'], ['invoice_details', 'פרטים לחשבונית'],
                    ['company_shareholders_approval', 'אישור בעלי מניות ומורשה חתימה'], ['other', 'אחר']];
-  var LEAD_STATUSES = [['new', 'חדש'], ['contacted', 'נוצר קשר'], ['converted', 'הפך ללקוח'], ['closed', 'נסגר'], ['spam', 'ספאם']];
-  var leads = { rows: [], counts: {}, filter: '', loaded: false };
+  var LEAD_STATUSES = [['new', 'חדש'], ['no_answer', 'לא ענה'], ['contacted', 'בטיפול'], ['meeting', 'נקבעה פגישה'],
+                       ['converted', 'הפך ללקוח'], ['closed', 'לא רלוונטי'], ['spam', 'ספאם']];
+  var LEAD_OPEN = ['new', 'no_answer', 'contacted', 'meeting'];
+  var leads = { rows: [], counts: {}, filter: '', loaded: false, staff: [], me: null, canAssign: false,
+                q: '', src: '', who: '', sort: 'new' };
+  (function () { // סינון ומיון נשמרים לכל משתמש בדפדפן שלו
+    try { var v = JSON.parse(localStorage.getItem('ym.leadView') || '{}');
+      ['filter', 'src', 'who', 'sort'].forEach(function (k) { if (typeof v[k] === 'string') leads[k] = v[k]; });
+    } catch (e) {}
+  })();
+  function saveLeadView() {
+    try { localStorage.setItem('ym.leadView', JSON.stringify({ filter: leads.filter, src: leads.src, who: leads.who, sort: leads.sort })); } catch (e) {}
+  }
   var DEAL_STATUSES = [['open', 'פתוחה'], ['pending_signatures', 'ממתינה לחתימות'], ['completed', 'הושלמה'], ['cancelled', 'בוטלה']];
 
   /* ---------- חלון שאלה/אישור בתוך הדף (במקום prompt/confirm של הדפדפן, שנחסמים בחלק מהטלפונים) ---------- */
@@ -145,18 +156,23 @@
     if (!leads.loaded) loadLeads();
   }
 
-  /* ---------- לידים מהאתר ---------- */
+  /* ---------- לידים: סטטוס, שיוך, סינון ומיון ---------- */
+  function openCount() { return LEAD_OPEN.reduce(function (n, k) { return n + (Number(leads.counts[k]) || 0); }, 0); }
+
   async function loadLeads() {
     var r, seq = (leads.seq = (leads.seq || 0) + 1);
-    try { r = await YM.api('/leads/list', { token: session.token, status: leads.filter || null, limit: 200 }); }
+    try { r = await YM.api('/leads/list', { token: session.token, status: leads.filter || null, limit: 500 }); }
     catch (err) { document.getElementById('lead-rows').innerHTML = '<div class="empty">' + E(err.message) + '</div>'; return; }
     if (seq !== leads.seq) return; // תשובה ישנה — כבר נשלחה בקשה חדשה יותר
     if (r.ok !== true) { document.getElementById('lead-rows').innerHTML = '<div class="empty">' + E(r.message_he || 'טעינת הלידים נכשלה.') + '</div>'; return; }
     leads.rows = r.leads || []; leads.counts = r.counts || {}; leads.loaded = true;
-    var open = (Number(leads.counts.new) || 0) + (Number(leads.counts.contacted) || 0);
+    leads.staff = r.staff || []; leads.me = r.me || null; leads.canAssign = r.can_assign === true;
+    var open = openCount();
     var badge = document.getElementById('leads-count');
     badge.textContent = open; badge.hidden = !open;
+    if (LEAD_LINK) { leads.q = ''; leads.src = ''; leads.who = ''; } // קישור ממייל — לא להסתיר את הליד בסינון
     renderLeadFilters();
+    renderLeadTools();
     renderLeads();
     if (LEAD_LINK) {
       var hit = document.querySelector('.lead-row[data-id="' + LEAD_LINK.replace(/[^0-9a-f-]/gi, '') + '"]');
@@ -172,14 +188,68 @@
 
   function renderLeadFilters() {
     var host = document.getElementById('lead-filters');
-    var opts = [['', 'פתוחים'], ['new', 'חדשים'], ['contacted', 'נוצר קשר'], ['converted', 'הפכו ללקוח'], ['closed', 'נסגרו'], ['spam', 'ספאם'], ['all', 'הכל']];
+    var opts = [['', 'פתוחים']].concat(LEAD_STATUSES).concat([['all', 'הכל']]);
     host.innerHTML = opts.map(function (o) {
-      var n = o[0] === '' ? (Number(leads.counts.new) || 0) + (Number(leads.counts.contacted) || 0) : o[0] === 'all' ? null : (leads.counts[o[0]] || 0);
+      var n = o[0] === '' ? openCount() : o[0] === 'all' ? null : (Number(leads.counts[o[0]]) || 0);
       return '<button class="chip' + (leads.filter === o[0] ? ' is-active' : '') + '" type="button" data-f="' + o[0] + '">' + o[1] + (n !== null ? ' · ' + n : '') + '</button>';
     }).join('');
     host.querySelectorAll('.chip').forEach(function (c) {
-      c.addEventListener('click', function () { leads.filter = c.getAttribute('data-f'); loadLeads(); });
+      c.addEventListener('click', function () { leads.filter = c.getAttribute('data-f'); saveLeadView(); loadLeads(); });
     });
+  }
+
+  function renderLeadTools() {
+    var who = document.getElementById('lead-who');
+    var opts = [['', 'כל האחראים'], ['me', 'שלי'], ['none', 'לא משויכים']].concat(
+      leads.staff.filter(function (s) { return s.id !== leads.me; }).map(function (s) { return [s.id, s.name]; }));
+    if (leads.who && !opts.some(function (o) { return o[0] === leads.who; })) leads.who = '';
+    who.innerHTML = opts.map(function (o) { return '<option value="' + E(o[0]) + '">' + E(o[1]) + '</option>'; }).join('');
+    who.value = leads.who;
+    document.getElementById('lead-src').value = leads.src;
+    document.getElementById('lead-sort').value = leads.sort;
+    document.getElementById('lead-q').value = leads.q;
+  }
+
+  (function wireLeadTools() {
+    var q = document.getElementById('lead-q'), t;
+    q.addEventListener('input', function () { clearTimeout(t); t = setTimeout(function () { leads.q = q.value.trim(); renderLeads(); }, 150); });
+    [['lead-src', 'src'], ['lead-who', 'who'], ['lead-sort', 'sort']].forEach(function (x) {
+      var el = document.getElementById(x[0]);
+      el.addEventListener('change', function () { leads[x[1]] = el.value; saveLeadView(); renderLeads(); });
+    });
+    document.getElementById('lead-reset').addEventListener('click', function () {
+      leads.q = ''; leads.src = ''; leads.who = ''; saveLeadView(); renderLeadTools(); renderLeads();
+    });
+  })();
+
+  function digits(x) { return String(x || '').replace(/\D/g, ''); }
+  function visibleLeads() {
+    var q = leads.q.toLowerCase(), qd = digits(leads.q);
+    var rows = leads.rows.filter(function (l) {
+      if (leads.src && l.source !== leads.src) return false;
+      if (leads.who === 'me' && l.assigned_to !== leads.me) return false;
+      if (leads.who === 'none' && l.assigned_to) return false;
+      if (leads.who && leads.who !== 'me' && leads.who !== 'none' && l.assigned_to !== leads.who) return false;
+      if (!q) return true;
+      if (qd.length >= 3) {
+        var p = digits(l.phone);
+        if (p.indexOf(qd) >= 0 || p.indexOf(qd.replace(/^0/, '972')) >= 0) return true;
+      }
+      return [l.full_name, l.email, l.brand, l.interest, l.message, l.form_name, l.campaign_name, l.notes, l.assigned_to_name]
+        .some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; });
+    });
+    var order = {}; LEAD_STATUSES.forEach(function (s, i) { order[s[0]] = i; });
+    var t = function (l) { return new Date(l.created_at).getTime() || 0; };
+    rows.sort(function (a, b) {
+      if (leads.sort === 'old') return t(a) - t(b);
+      if (leads.sort === 'status') return ((order[a.status] || 0) - (order[b.status] || 0)) || (t(b) - t(a));
+      if (leads.sort === 'owner') {
+        var an = a.assigned_to_name || '￿', bn = b.assigned_to_name || '￿';
+        return an.localeCompare(bn, 'he') || (t(b) - t(a));
+      }
+      return t(b) - t(a);
+    });
+    return rows;
   }
 
   var LEAD_SOURCES = { website_form: ['אתר', 'web'], facebook_lead_ad: ['פייסבוק', 'fb'] };
@@ -188,17 +258,36 @@
     return '<span class="lead-src ' + src[1] + '">' + E(src[0]) + '</span>';
   }
 
+  function assignControl(l) {
+    if (leads.canAssign) {
+      return '<select class="small lead-assign-sel" aria-label="אחראי על הליד"><option value="">לא משויך</option>' +
+        leads.staff.map(function (s) {
+          return '<option value="' + E(s.id) + '"' + (s.id === l.assigned_to ? ' selected' : '') + '>' + E(s.name) + '</option>';
+        }).join('') +
+        (l.assigned_to && !leads.staff.some(function (s) { return s.id === l.assigned_to; })
+          ? '<option value="' + E(l.assigned_to) + '" selected>' + E(l.assigned_to_name || '—') + '</option>' : '') +
+        '</select>';
+    }
+    if (!l.assigned_to) return '<button class="btn-icon lead-take" type="button">קח ליד</button>';
+    if (l.assigned_to === leads.me) return '<button class="btn-icon lead-release" type="button">שחרר</button>';
+    return '';
+  }
+
   function renderLeads() {
     var host = document.getElementById('lead-rows');
-    if (!leads.rows.length) {
-      host.innerHTML = '<div class="empty">אין לידים בסינון הזה.</div>';
+    var filtered = !!(leads.q || leads.src || leads.who);
+    document.getElementById('lead-reset').hidden = !filtered;
+    var rows = visibleLeads();
+    if (!rows.length) {
+      host.innerHTML = '<div class="empty">' + (filtered ? 'אין לידים שמתאימים לסינון.' : 'אין לידים בסינון הזה.') + '</div>';
       document.getElementById('lead-foot').innerHTML = '';
       return;
     }
-    host.innerHTML = leads.rows.map(function (l) {
+    host.innerHTML = rows.map(function (l) {
       var interest = [l.brand, l.interest].filter(Boolean).join(' · ');
       var done = l.status === 'converted' || l.status === 'spam' || l.status === 'closed';
-      return '<div class="lead-row" data-id="' + E(l.id) + '">' +
+      var othersLead = l.assigned_to && l.assigned_to !== leads.me && !leads.canAssign;
+      return '<div class="lead-row' + (l.assigned_to === leads.me ? ' is-mine' : '') + '" data-id="' + E(l.id) + '">' +
         '<div><div class="l-name">' + E(l.full_name || '—') + '</div>' +
           (l.message ? '<div class="l-msg">' + E(String(l.message).slice(0, 160)) + '</div>' : '') +
           (l.customer_name ? '<div class="l-sub">לקוח: ' + E(l.customer_name) + '</div>' : (Number(l.matching_customers) ? '<div class="l-sub">יש כבר לקוח עם הטלפון הזה</div>' : '')) +
@@ -207,14 +296,16 @@
         '<div class="l-int">' + leadSourceBadge(l) + '<div>' + E(interest || '—') + '</div>' +
           (l.form_name ? '<div class="l-sub">טופס: ' + E(l.form_name) + '</div>' : '') +
           (l.campaign_name ? '<div class="l-sub">קמפיין: ' + E(l.campaign_name) + '</div>' : '') + '</div>' +
-        '<div class="l-when">' + E(fmtDT(l.created_at)) + (l.handled_by_name ? '<div class="l-sub">טופל: ' + E(l.handled_by_name) + '</div>' : '') + '</div>' +
-        '<div><span class="lead-status ' + E(l.status) + '">' + E(l.status_he) + '</span></div>' +
+        '<div class="l-when">' + E(fmtDT(l.created_at)) + (l.handled_by_name ? '<div class="l-sub">טופל: ' + E(l.handled_by_name) + (l.handled_at ? ' · ' + E(fmtDT(l.handled_at)) : '') + '</div>' : '') + '</div>' +
+        '<div><span class="lead-status ' + E(l.status) + '">' + E(l.status_he) + '</span>' +
+          '<div class="l-owner' + (l.assigned_to ? '' : ' none') + '">' + (l.assigned_to ? E(l.assigned_to === leads.me ? 'שלי' : (l.assigned_to_name || '—')) : 'לא משויך') + '</div></div>' +
         '<div class="l-act">' +
           (done ? (l.customer_id ? '<button class="btn-icon lead-open" type="button" data-cid="' + E(l.customer_id) + '">פתח לקוח</button>' : '') :
-            '<button class="btn-icon lead-convert" type="button">הפוך ללקוח</button>') +
-          '<select class="small lead-status-sel" aria-label="סטטוס ליד">' + LEAD_STATUSES.map(function (x) {
+            (othersLead ? '' : '<button class="btn-icon lead-convert" type="button">הפוך ללקוח</button>')) +
+          (othersLead ? '' : '<select class="small lead-status-sel" aria-label="סטטוס ליד">' + LEAD_STATUSES.map(function (x) {
             return '<option value="' + x[0] + '"' + (x[0] === l.status ? ' selected' : '') + '>' + x[1] + '</option>';
-          }).join('') + '</select>' +
+          }).join('') + '</select>') +
+          assignControl(l) +
           '<button class="btn-icon lead-note" type="button" title="הערה">✎</button>' +
         '</div>' +
       '</div>';
@@ -233,6 +324,12 @@
       if (op) op.addEventListener('click', function () { openCard(op.getAttribute('data-cid')); });
       var sel = row.querySelector('.lead-status-sel');
       if (sel) sel.addEventListener('change', function () { updateLead({ lead_id: id, status: sel.value }); });
+      var as = row.querySelector('.lead-assign-sel');
+      if (as) as.addEventListener('change', function () { updateLead({ lead_id: id, assigned_to: as.value }); });
+      var tk = row.querySelector('.lead-take');
+      if (tk) tk.addEventListener('click', function () { updateLead({ lead_id: id, assigned_to: 'me' }); });
+      var rl = row.querySelector('.lead-release');
+      if (rl) rl.addEventListener('click', function () { updateLead({ lead_id: id, assigned_to: '' }); });
       var nb = row.querySelector('.lead-note');
       if (nb) nb.addEventListener('click', async function () {
         var txt = await uiPrompt('הערה לליד:', lead.notes || '');
@@ -240,7 +337,7 @@
         updateLead({ lead_id: id, notes: txt });
       });
     });
-    document.getElementById('lead-foot').innerHTML = 'מוצגים ' + leads.rows.length + ' לידים';
+    document.getElementById('lead-foot').innerHTML = 'מוצגים ' + rows.length + (rows.length !== leads.rows.length ? ' מתוך ' + leads.rows.length : '') + ' לידים';
   }
 
   async function updateLead(payload) {
