@@ -258,7 +258,7 @@
       kv('מרכב', s.body || null),
       kv('דלתות', s.doors, 'num'),
       kv('מושבים', s.seats, 'num'),
-      kv('משקל כולל', s.gvwr || null),
+      kv('משקל כולל (טווח הקטגוריה)', s.gvwr || null),
       kv('חישוקים', s.wheels_in ? s.wheels_in + ' אינץ׳' : null),
       kv('ארץ ייצור', s.plant_country ? s.plant_country + (s.plant_city ? ' · ' + s.plant_city : '') : null)
     ]);
@@ -342,6 +342,100 @@
     }).join('') + '</div>';
   }
 
+  /* ---------- תאריך ייצור ומדבקת הדלת ----------
+     צילום של מדבקת היצרן במשקוף הדלת (מסמכי התיק → "צילום מדבקה") נקרא אוטומטית.
+     אם מספר השלדה במדבקה תואם לתיק — תאריך הייצור, המשקלים והצמיגים נשמרים בכרטיס
+     (vehicle_view → door_sticker). עריכה ידנית של תאריך הייצור גוברת על המדבקה. */
+  function prodMonth(iso) {
+    var p = String(iso || '').slice(0, 10).split('-');
+    return p.length === 3 ? p[1] + '/' + p[0] : String(iso || '');
+  }
+  // בלי יום מדויק (MDH במדבקות Stellantis), ה-1 בחודש הוא רק ברירת מחדל — מציגים חודש ושנה
+  function prodLabel(iso, exact) {
+    var p = String(iso || '').slice(0, 10).split('-');
+    if (p.length !== 3) return iso ? String(iso) : null;
+    return (exact || p[2] !== '01') ? p[2] + '.' + p[1] + '.' + p[0] : p[1] + '/' + p[0];
+  }
+  function kgLb(kg, lb, approx) {
+    var n = function (x) { return Number(x).toLocaleString('en-US'); };
+    if (kg == null && lb == null) return null;
+    if (kg == null) return n(lb) + ' ליברות';
+    return (approx ? '≈ ' : '') + n(kg) + ' ק״ג' + (lb != null ? ' (' + n(lb) + ' ליברות)' : '');
+  }
+  function frontRear(f, r, unit) {
+    if (f == null && r == null) return null;
+    var u = unit ? ' ' + unit : '';
+    if (f != null && r != null && String(f) !== String(r)) return 'קדמי ' + f + ' · אחורי ' + r + u;
+    return (f != null ? f : r) + u;
+  }
+
+  function stickerHtml(v) {
+    var ds = v.door_sticker || null;
+    var pd = v.production_date || null;
+    var fromSticker = !!(ds && ds.production_date && ds.production_date === pd);
+    var exact = fromSticker && ds.day_exact === true;
+    var calc = (ds && ds.calc) || [];
+    var approx = function (k) { return calc.indexOf(k) > -1; };
+    var srcHe = !pd ? null : fromSticker ? 'מדבקת הדלת'
+      : v.production_date_source === 'manual' ? 'הוזן ידנית בפאנל' : 'גיליון המלאי / ההזמנה';
+    var rows = [
+      kv('תאריך ייצור', prodLabel(pd, exact), 'num'),
+      kv('מקור התאריך', srcHe)
+    ];
+    if (ds) {
+      rows = rows.concat([
+        kv('כתוב במדבקה', [ds.mfr_date_raw, ds.mdh ? 'MDH ' + ds.mdh : ''].filter(Boolean).join(' · ') || null, 'num'),
+        kv('יצרן', ds.manufacturer),
+        kv('ארץ ייצור', ds.made_in),
+        kv('משקל כולל מותר (GVWR)', kgLb(ds.gvwr_kg, ds.gvwr_lb, approx('gvwr_kg')), 'num'),
+        kv('עומס מותר — סרן קדמי', kgLb(ds.gawr_front_kg, ds.gawr_front_lb, approx('gawr_front_kg')), 'num'),
+        kv('עומס מותר — סרן אחורי', kgLb(ds.gawr_rear_kg, ds.gawr_rear_lb, approx('gawr_rear_kg')), 'num'),
+        kv('צמיגים', frontRear(ds.tire_front, ds.tire_rear), 'num'),
+        kv('חישוקים', frontRear(ds.rim_front, ds.rim_rear), 'num'),
+        kv('לחץ אוויר בקור', frontRear(ds.tire_pressure_front_psi, ds.tire_pressure_rear_psi, 'PSI'), 'num'),
+        kv('סוג רכב', ds.vehicle_type),
+        kv('קוד צבע', ds.paint_code, 'num'),
+        kv('תקינה במדבקה', ds.standard === 'FMVSS' ? 'אמריקאית (FMVSS)' : ds.standard === 'CMVSS' ? 'קנדית (CMVSS)'
+          : ds.standard === 'FMVSS+CMVSS' ? 'אמריקאית וקנדית' : null)
+      ]);
+    }
+    var live = rows.filter(Boolean);
+    var h = '<div class="sect" id="ds-sect"><h3>ייצור ומדבקת הדלת</h3>';
+    if (live.length) h += '<div class="kv">' + live.join('') + '</div>';
+
+    var notes = [];
+    if (ds && ds.production_date && pd && ds.production_date !== pd) {
+      notes.push(['warn', 'במדבקה כתוב ' + prodLabel(ds.production_date, ds.day_exact === true) + ', ובכרטיס רשום ' + prodLabel(pd, false) +
+        (v.production_date_source === 'manual'
+          ? ' (הוזן ידנית, ולכן נשמר). כדי לעבור לתאריך המדבקה: עריכת פרטי הרכב, ושחרור השדה.' : '.')]);
+    }
+    if (fromSticker && ds.previous_production_date && prodMonth(ds.previous_production_date) !== prodMonth(pd)) {
+      notes.push(['info', 'לפני קריאת המדבקה היה רשום ' + prodLabel(ds.previous_production_date, false) + '.']);
+    }
+    if (ds && !ds.production_date) notes.push(['warn', 'תאריך הייצור לא נקרא מהצילום. כדאי לצלם שוב מקרוב, בלי השתקפות.']);
+    if (calc.length) notes.push(['info', 'במדבקה המשקל מופיע בליברות בלבד. הק״ג חושב (≈).']);
+    h += notes.map(function (n) {
+      return '<div class="' + (n[0] === 'warn' ? 'ds-warn' : 'fc-info') + '">' + E(n[1]) + '</div>';
+    }).join('');
+
+    var pending = ((v.file_checks || {}).counts || {}).pending;
+    var doc = ds && ds.file_source === 'document'
+      ? (v.documents || []).filter(function (d) { return d.id === ds.file_id; })[0] : null;
+    var foot = '';
+    if (ds && ds.read_at) {
+      foot = 'נקרא מהצילום ב-' + E(fmtDT(ds.read_at)) +
+        (doc && doc.drive_url ? ' · <a href="' + E(doc.drive_url) + '" target="_blank" rel="noopener">צילום המדבקה</a>' : '');
+    } else if (!pending) {
+      foot = 'צילום של מדבקת היצרן במשקוף דלת הנהג ממלא כאן אוטומטית את תאריך הייצור המדויק, המשקלים והצמיגים.';
+    }
+    if (pending) foot += (foot ? '<br>' : '') + 'יש קובץ בתיק שעדיין נקרא. אם זו מדבקת הדלת, הנתונים יתעדכנו כאן תוך כמה דקות.';
+    if (foot) h += '<p class="note">' + foot + '</p>';
+    h += '<div class="doc-tools"><button class="btn-icon" type="button" id="ds-up">' +
+      (ds ? 'העלאת צילום מדבקה חדש' : 'העלאת צילום מדבקת הדלת') + '</button>' +
+      (pending ? ' <button class="btn-icon" type="button" id="ds-refresh">רענון</button>' : '') + '</div>';
+    return h + '</div>';
+  }
+
   function fmtDT(iso) {
     if (!iso) return '';
     var d = new Date(iso);
@@ -357,6 +451,10 @@
     if (iu) iu.addEventListener('click', function () { pickFile({ scope: 'vehicle', target_id: v.id, doc_type: 'imr', btn: 'imr-up' }); });
     var ir = document.getElementById('imr-refresh');
     if (ir) ir.addEventListener('click', function () { openCard(cardRef); });
+    var du = document.getElementById('ds-up');
+    if (du) du.addEventListener('click', function () { pickFile({ scope: 'vehicle', target_id: v.id, doc_type: 'sticker_photo', btn: 'ds-up' }); });
+    var dr = document.getElementById('ds-refresh');
+    if (dr) dr.addEventListener('click', function () { openCard(cardRef); });
     var up = document.getElementById('vdoc-up');
     if (up) up.addEventListener('click', function () {
       pickFile({ scope: 'vehicle', target_id: v.id, doc_type: document.getElementById('vdoc-type').value });
@@ -491,6 +589,7 @@
         '<span class="status-pill">' + E(v.status_he) + '</span>' +
         (v.location ? '<span class="tag">' + E(v.location) + '</span>' : '') +
         (v.model_year ? '<span class="tag">' + E(v.model_year) + '</span>' : '') +
+        (v.production_date ? '<span class="tag">ייצור ' + E(prodMonth(v.production_date)) + '</span>' : '') +
         '<span class="tag">' + E(v.days_in_stock) + ' ימים במלאי</span>' +
       '</div>' +
       (res.viewer && res.viewer.can_edit
@@ -509,6 +608,7 @@
       kv('ריפוד', v.upholstery)
     ]);
 
+    h += stickerHtml(v);
     h += specHtml(v);
 
     var feat = v.features || {};
