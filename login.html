@@ -42,6 +42,7 @@
   .msg { font-size: 13px; line-height: 1.6; border-radius: 6px; padding: 10px 12px; }
   .msg.err { background: var(--accent-tint); color: var(--accent-soft); border: 1px solid rgba(200,16,46,.35); }
   .msg.ok  { background: var(--chip-bg); color: var(--text-mid); border: 1px solid var(--border-chip); }
+  .msg strong { color: var(--text); font-weight: 500; unicode-bidi: isolate; }
   .linkish {
     background: none; border: 0; padding: 0; cursor: pointer;
     font-size: 13px; color: var(--accent-soft); font-family: inherit;
@@ -75,13 +76,19 @@
   <!-- שלב 2: קוד -->
   <form class="auth-card hidden" id="step-code" autocomplete="off">
     <h1>הזנת הקוד</h1>
-    <p class="sub">שלחנו קוד בן 6 ספרות לוואטסאפ של <span id="phone-echo" dir="ltr"></span>.<br>הקוד תקף ל-5 דקות.</p>
+    <p class="sub">אם המספר <span id="phone-echo" dir="ltr"></span> רשום במערכת, נשלח אליו עכשיו קוד בן 6 ספרות בוואטסאפ.<br>הקוד תקף ל-5 דקות.</p>
     <div class="field">
       <label for="code">קוד חד-פעמי</label>
       <input id="code" name="one-time-code" type="text" inputmode="numeric" pattern="[0-9]*"
              maxlength="6" autocomplete="one-time-code" placeholder="------" required>
     </div>
     <div class="msg err hidden" id="code-msg"></div>
+    <!-- מוצג אחרי המתנה לקוד, או כשאין קוד פעיל למספר: התשובה מהשרת אחידה, ולכן רק מזכירים לבדוק את המספר -->
+    <div class="msg ok hidden" id="no-code-hint" role="status">
+      לא הגיע קוד? בדקו שהקלדתם את המספר הנכון: <strong id="hint-phone" dir="ltr"></strong>.
+      קוד נשלח רק למספר שרשום במערכת כעובד פעיל.
+      <button type="button" class="linkish" id="fix-phone-btn">תיקון המספר</button>
+    </div>
     <button class="btn-primary block" type="submit" id="code-btn">כניסה</button>
     <div class="row-between">
       <button type="button" class="linkish" id="resend-btn" disabled>שליחת קוד חדש</button>
@@ -104,8 +111,11 @@
   var phoneBtn  = document.getElementById('phone-btn');
   var codeBtn   = document.getElementById('code-btn');
   var resendBtn = document.getElementById('resend-btn');
+  var noCodeHint = document.getElementById('no-code-hint');
   var currentPhone = '';
   var resendTimer = null;
+  var hintTimer = null;
+  var HINT_DELAY_MS = 30000;
 
   // לאן לחזור אחרי הכניסה (למשל קישור לליד מהמייל). רק דף פנימי של הפאנל.
   var NEXT = (function () {
@@ -123,6 +133,21 @@
     el.className = 'msg ' + (kind || 'err');
   }
   function hide(el) { el.className = 'msg err hidden'; }
+
+  // רמז "לא הגיע קוד?" — השרת לא חושף אם המספר רשום, אז עוזרים למי שטעה בהקלדה בלי לחשוף כלום.
+  function showNoCodeHint() {
+    clearTimeout(hintTimer);
+    document.getElementById('hint-phone').textContent = currentPhone;
+    noCodeHint.classList.remove('hidden');
+  }
+  function hideNoCodeHint() {
+    clearTimeout(hintTimer);
+    noCodeHint.classList.add('hidden');
+  }
+  function scheduleNoCodeHint() {
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(showNoCodeHint, HINT_DELAY_MS);
+  }
 
   function startResendCooldown(seconds) {
     var left = seconds;
@@ -165,6 +190,8 @@
       stepCode.classList.remove('hidden');
       codeIn.focus();
       startResendCooldown(45);
+      hideNoCodeHint();
+      scheduleNoCodeHint();
     } catch (err) {
       show(phoneMsg, err.message);
     } finally {
@@ -178,22 +205,28 @@
     resendBtn.disabled = true;
     try {
       await requestOtp(currentPhone);
-      show(codeMsg, 'נשלח קוד חדש בוואטסאפ.', 'ok');
+      show(codeMsg, 'אם המספר רשום במערכת — נשלח אליו קוד חדש בוואטסאפ.', 'ok');
       startResendCooldown(45);
+      // מי שביקש קוד שוב כנראה לא קיבל את הראשון — מציגים את הרמז מיד.
+      showNoCodeHint();
     } catch (err) {
       show(codeMsg, err.message);
       resendBtn.disabled = false;
     }
   });
 
-  document.getElementById('back-btn').addEventListener('click', function () {
+  function backToPhone() {
     clearInterval(resendTimer);
+    hideNoCodeHint();
     codeIn.value = '';
     hide(codeMsg);
     stepCode.classList.add('hidden');
     stepPhone.classList.remove('hidden');
     phoneIn.focus();
-  });
+    phoneIn.select();
+  }
+  document.getElementById('back-btn').addEventListener('click', backToPhone);
+  document.getElementById('fix-phone-btn').addEventListener('click', backToPhone);
 
   codeIn.addEventListener('input', function () {
     codeIn.value = codeIn.value.replace(/\D/g, '').slice(0, 6);
@@ -210,10 +243,13 @@
       var res = await YM.api('/staff-auth/verify', { phone: currentPhone, code: code });
       if (res.ok !== true || !res.session_token) {
         var text = res.message_he || 'הקוד שגוי או שפג תוקפו.';
-        if (typeof res.attempts_left === 'number') {
+        // הודעת השרת כבר כוללת את מספר הניסיונות שנותרו — לא מכפילים.
+        if (typeof res.attempts_left === 'number' && text.indexOf('נותרו') === -1) {
           text += ' נותרו ' + res.attempts_left + ' ניסיונות.';
         }
         show(codeMsg, text);
+        // אין קוד פעיל למספר הזה: או שפג תוקפו, או שהמספר שהוקלד אינו רשום ולכן לא נשלח קוד כלל.
+        if (res.error === 'NO_ACTIVE_OTP') { showNoCodeHint(); }
         return;
       }
       YM.saveSession(res);
