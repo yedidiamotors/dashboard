@@ -519,6 +519,7 @@
     }).join('') + '</div>';
     h += termsHtml(d, mine, closed);
     h += cartHtml(d);
+    h += orderFormHtml(d, mine);
     h += agreementHtml(d, mine);
     if (d.deal_status !== 'cancelled') {
       h += '<div class="checklist" data-deal="' + E(d.id) + '"><div class="cl-head"><span>מסמכי לקוח · רישוי ומסירה</span><button class="btn-icon cl-toggle" type="button">הצג checklist</button></div><div class="cl-body" hidden></div></div>';
@@ -648,6 +649,144 @@
   function sumCell(k, v, strong) {
     var txt = v == null ? '—' : (v < 0 ? '−' + YM.nis(-v) : YM.nis(v));
     return '<div' + (strong ? ' class="strong"' : '') + '><span class="k">' + E(k) + '</span><span class="v">' + E(txt) + '</span></div>';
+  }
+
+  /* ---------- טופס הזמנה (Word/PDF בפורמט של ידידיה) — טופס לכל רכב, מופק רק לבקשת איש המכירות ---------- */
+  function orderFormHtml(d, mine) {
+    if (!cartLookup(d.id) || !d.vehicle || d.deal_status === 'cancelled') return '';
+    return '<div class="ofm" data-deal="' + E(d.id) + '"><div class="cl-head"><span>טופס הזמנה</span>' +
+      (mine && can('create_customer_deal') ? '<button class="btn-icon primary of-open" type="button">טופס הזמנה לרכב</button>' : '') +
+      '</div></div>';
+  }
+
+  async function orderFormCall(payload) {
+    payload.token = session.token;
+    try { return await YM.api('/orders/form', payload); } catch (err) { return { ok: false, message_he: err.message }; }
+  }
+
+  async function openOrderForm(dealId) {
+    var wrap = document.createElement('div');
+    wrap.className = 'modal ofm-modal';
+    wrap.innerHTML = '<div class="modal-box wide" role="dialog" aria-modal="true"><button class="modal-x" type="button" aria-label="סגירה">×</button>' +
+      '<h2>טופס הזמנה</h2><div class="ofm-body"><div class="empty small">טוען…</div></div></div>';
+    document.body.appendChild(wrap);
+    var close = function () { document.removeEventListener('keydown', onKey, true); wrap.remove(); };
+    var onKey = function (e) { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    wrap.querySelector('.modal-x').addEventListener('click', close);
+    wrap.addEventListener('click', function (e) { if (e.target === wrap) close(); });
+    var body = wrap.querySelector('.ofm-body');
+
+    var r = await orderFormCall({ action: 'prepare', deal_id: dealId });
+    if (r.ok !== true) { body.innerHTML = '<div class="banner">' + E(r.message_he || 'לא ניתן לטעון את נתוני הטופס.') + '</div>'; return; }
+    var L = r.locked || {}, ed = r.editable || {}, sg = r.suggestions || {};
+
+    var row = function (k, v) { return '<div><span class="k">' + E(k) + '</span><span class="v">' + (v ? E(v) : '<em>—</em>') + '</span></div>'; };
+    var sugList = function (items, group) {
+      return items.map(function (x, i) {
+        return '<label class="ofm-sug"><input type="checkbox" data-group="' + group + '" data-kind="' + E(x.kind) + '" data-text="' + E(x.text) + '">' +
+          '<span>' + E(x.text) + '</span><span class="kind">' + (x.kind === 'addition' ? 'תוספת' : 'הערה') +
+          (x.times > 1 ? ' · ' + x.times + ' רכבים' : '') + '</span></label>';
+      }).join('');
+    };
+    var h = '';
+    if ((r.gaps || []).length) h += '<div class="banner">חסר כדי להפיק: ' + E(r.gaps.join(' · ')) + '</div>';
+    if ((r.warnings || []).length) h += '<div class="banner info">' + r.warnings.map(E).join('<br>') + '</div>';
+
+    h += '<div class="ofm-sec"><h3>מהמערכת <span class="hint">נעול — שינוי דרך כרטיס הלקוח, העסקה או המלאי</span></h3><div class="ofm-grid">' +
+      row('מזמין', L.customer_name) + row(L.customer_id_label, L.customer_id) + row('טלפון', L.customer_phone) +
+      row('כתובת', L.customer_address) + row('אימייל', L.customer_email) +
+      row('יירשם על שם', [L.registered_name, L.registered_id ? L.registered_id_label + ' ' + L.registered_id : ''].filter(Boolean).join(' · ')) +
+      row('רכב', [L.make, L.model].filter(Boolean).join(' ')) + row('שילדה', L.vin) +
+      row('צבע חוץ / פנים', [L.color_ext, L.color_int].filter(Boolean).join(' / ')) +
+      row('מחיר לפני מע"מ', L.price_ex_vat ? L.price_ex_vat + ' ₪' : '') +
+      row('דמי חיבור מערכת איתור', L.tracker_connection_fee ? L.tracker_connection_fee + ' ₪' : '') +
+      row('אגרת רישוי', L.license_fee ? L.license_fee + ' ₪' : '') + '</div></div>';
+
+    h += '<div class="ofm-sec form"><h3>לפני הורדה</h3><div class="ofm-fields">' +
+      '<div class="field"><label for="of-mc">קוד דגם</label><input id="of-mc" dir="ltr" maxlength="30" value="' + E(ed.model_code) + '"></div>' +
+      '<div class="field"><label for="of-rm">חודש רישום</label><select id="of-rm"><option value=""></option>' +
+        ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'].map(function (m) {
+          return '<option' + (m === ed.registration_month ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label for="of-ry">שנת רישום</label><input id="of-ry" inputmode="numeric" maxlength="4" dir="ltr" value="' + E(ed.registration_year) + '"></div>' +
+      '<div class="field"><label for="of-tp">מערכת איתור (₪)</label><input id="of-tp" inputmode="numeric" dir="ltr" value="' + E(ed.tracker_price) + '">' +
+        '<label class="ofm-chk"><input type="checkbox" id="of-ts"' + (ed.tracker_struck ? ' checked' : '') + '> המחיר מחוק בטופס</label></div>' +
+      '</div>' +
+      '<div class="field"><label for="of-add">תוספות <span class="hint">מופרדות בפסיק · ברירת המחדל: התוספות המאושרות בסל</span></label><textarea id="of-add" rows="2" maxlength="400">' + E(ed.additions) + '</textarea></div>' +
+      '<div class="field"><label for="of-notes">הערות (כלול) <span class="hint">מופרדות בפסיק</span></label><textarea id="of-notes" rows="2" maxlength="400">' + E(ed.notes) + '</textarea></div>' +
+      '</div>';
+
+    if ((sg.vehicle || []).length || (sg.model || []).length) {
+      h += '<div class="ofm-sec"><h3>נכנס בעבר — להוסיף? <span class="hint">מסמנים, וזה נכנס לשדה המתאים</span></h3>' +
+        ((sg.vehicle || []).length ? '<div class="ofm-sg-t">לרכב הזה</div>' + sugList(sg.vehicle, 'vehicle') : '') +
+        ((sg.model || []).length ? '<div class="ofm-sg-t">לרכבים מאותו דגם</div>' + sugList(sg.model, 'model') : '') + '</div>';
+    }
+
+    var vers = r.versions || [];
+    if (vers.length) {
+      h += '<div class="ofm-sec"><h3>טפסים שהופקו</h3>' + vers.map(function (v) {
+        var stale = v.status === 'pending' && (Date.now() - new Date(v.created_at).getTime()) > 5 * 60000;
+        return '<div class="ofm-ver"><span>גרסה ' + v.version + ' · ' + fmtDT(v.created_at) + (v.created_by ? ' · ' + E(v.created_by) : '') +
+          (v.file_kind === 'docx' ? ' · Word' : v.file_kind === 'pdf' ? ' · PDF' : '') + '</span>' +
+          (v.status === 'ready' ? '<button class="btn-icon of-dl" type="button" data-form="' + E(v.id) + '">הורדה</button>'
+            : '<span class="hint">' + (v.status === 'failed' || stale ? 'נכשל' : 'בהפקה…') + '</span>') + '</div>';
+      }).join('') + '</div>';
+    }
+
+    h += '<div class="ofm-result"></div><div class="modal-actions">' +
+      '<button class="btn-primary of-gen" type="button"' + (r.can_generate ? '' : ' disabled') + '>הפקה והורדה</button>' +
+      '<button class="btn-ghost of-close" type="button">סגירה</button></div>';
+    body.innerHTML = h;
+    body.querySelector('.of-close').addEventListener('click', close);
+
+    // סימון המלצה מוסיף/מסיר את הטקסט מהשדה המתאים
+    body.querySelectorAll('.ofm-sug input').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var ta = body.querySelector(cb.dataset.kind === 'addition' ? '#of-add' : '#of-notes');
+        var parts = ta.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+        var t = cb.dataset.text, at = parts.indexOf(t);
+        if (cb.checked && at === -1) parts.push(t);
+        if (!cb.checked && at > -1) parts.splice(at, 1);
+        ta.value = parts.join(', ');
+      });
+    });
+
+    var showLink = function (url, label, warn) {
+      var box = body.querySelector('.ofm-result');
+      box.innerHTML = (warn ? '<div class="banner info">' + E(warn) + '</div>' : '') +
+        '<a class="btn-primary of-file" href="' + E(url) + '" target="_blank" rel="noopener">' + E(label) + '</a>';
+    };
+    body.querySelectorAll('.of-dl').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        b.disabled = true;
+        var x = await orderFormCall({ action: 'link', form_id: b.dataset.form });
+        b.disabled = false;
+        if (x.ok === true && x.url) showLink(x.url, 'פתיחת ' + (x.filename || 'הטופס'));
+        else notice(x.message_he || 'לא ניתן להוריד את הטופס.', 'err');
+      });
+    });
+
+    body.querySelector('.of-gen').addEventListener('click', async function () {
+      var g = this;
+      var used = Array.prototype.map.call(body.querySelectorAll('.ofm-sug input:checked'), function (cb) {
+        return { group: cb.dataset.group, kind: cb.dataset.kind, text: cb.dataset.text };
+      });
+      g.disabled = true; g.textContent = 'מפיק…';
+      var x = await orderFormCall({ action: 'generate', deal_id: dealId, suggested_used: used, fields: {
+        model_code: body.querySelector('#of-mc').value, registration_month: body.querySelector('#of-rm').value,
+        registration_year: body.querySelector('#of-ry').value, tracker_price: body.querySelector('#of-tp').value,
+        tracker_struck: body.querySelector('#of-ts').checked,
+        additions: body.querySelector('#of-add').value, notes: body.querySelector('#of-notes').value } });
+      g.textContent = 'הפקה והורדה'; g.disabled = false;
+      if (x.ok === true && x.url) {
+        showLink(x.url, x.file_kind === 'docx' ? 'הורדת הטופס (Word)' : 'הורדת הטופס (PDF)', x.warning);
+        notice(x.message_he || 'הטופס הופק.', 'ok');
+      } else if (x.gaps && x.gaps.length) {
+        notice('חסרים פרטים: ' + x.gaps.join(', '), 'err');
+      } else {
+        notice(x.message_he || 'הפקת הטופס נכשלה.', 'err');
+      }
+    });
   }
 
   var KIND_HE = { accessory: 'אביזר', service: 'שירות', custom: 'שורה חופשית' };
@@ -1261,6 +1400,9 @@
         notice(r.message_he || (r.ok ? 'ההסכם בוטל.' : 'הפעולה נכשלה.'), r.ok ? 'ok' : 'err');
         if (r.ok) openCard(state.cardId);
       });
+
+      var ofo = el.querySelector('.of-open');
+      if (ofo) ofo.addEventListener('click', function () { openOrderForm(id); });
     });
     bindOrders(res);
   }
