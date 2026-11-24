@@ -1787,7 +1787,9 @@
     // פעולות
     h += '<div class="actions">';
     if (!c.disabled_at && c.can_login) {
-      h += '<button class="btn-primary small" type="button" data-pt="invite-wa">שליחת הזמנה בוואטסאפ</button>' +
+      // "שליחת הזמנה בוואטסאפ" — יוצאת מהוואטסאפ של ידידיה מוטורס (תבנית). "שתף הזמנה" — מהוואטסאפ של איש המכירות.
+      h += '<button class="btn-primary small" type="button" data-pt="invite-biz" title="ההודעה נשלחת ללקוח מהוואטסאפ של ידידיה מוטורס">שליחת הזמנה בוואטסאפ</button>' +
+           '<button class="btn-ghost small" type="button" data-pt="invite-wa" title="פתיחת הוואטסאפ שלך עם הודעה מוכנה ללקוח">שתף הזמנה</button>' +
            '<button class="btn-ghost small" type="button" data-pt="invite-email"' + (c.invoice_email ? '' : ' disabled title="אין ללקוח מייל"') + '>הזמנה במייל</button>';
       (r.end_users || []).forEach(function (u) {
         h += '<button class="btn-ghost small" type="button" data-pt="invite-eu" data-deal="' + E(u.deal_id) + '">הזמנה לנהג בפועל (' + E(u.name) + ')</button>';
@@ -1939,7 +1941,7 @@
     try { r = await YM.api('/customers/portal', Object.assign({ token: session.token, customer_id: portal.customerId }, payload)); }
     catch (err) { r = { ok: false, message_he: err.message }; }
     if (btn) btn.disabled = false;
-    var text = r.message_he || (r.ok ? 'בוצע.' : 'הפעולה נכשלה.'), kind = r.ok && !r.email_failed ? 'ok' : 'err';
+    var text = r.message_he || (r.ok ? 'בוצע.' : 'הפעולה נכשלה.'), kind = r.ok && !r.email_failed && r.business_sent !== false ? 'ok' : 'err';
     if (r.ok) portal.msg = { text: text, kind: kind };   // יוצג אחרי הרענון
     else portalMsg(text, kind);
     return r;
@@ -1955,7 +1957,10 @@
     host.querySelectorAll('[data-pt]').forEach(function (b) {
       b.addEventListener('click', async function () {
         var act = b.getAttribute('data-pt'), res;
-        if (act === 'invite-wa' || act === 'invite-eu') {
+        if (act === 'invite-biz') {
+          if (!await uiConfirm('לשלוח ללקוח הודעה מהוואטסאפ של ידידיה מוטורס עם קישור לאיזור האישי?')) return;
+          res = await portalAction({ action: 'invite', channel: 'whatsapp', via: 'business' }, b);
+        } else if (act === 'invite-wa' || act === 'invite-eu') {
           // חלון נפתח מיד (בתוך הלחיצה) כדי שהדפדפן לא יחסום אותו; הכתובת נקבעת אחרי תשובת השרת
           var w = window.open('', '_blank');
           res = await portalAction({ action: 'invite', channel: 'whatsapp', end_user_deal_id: b.getAttribute('data-deal') || null }, b);
