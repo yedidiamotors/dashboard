@@ -445,6 +445,12 @@
   function bindCard(res) {
     var v = res.vehicle || {};
     YM.share.bind(document.getElementById('card-body'), v.share);
+    if (YM.publish) YM.publish.bind(document.getElementById('card-body'), res, {
+      token: session.token,
+      showCard: function (r) { document.getElementById('card-body').innerHTML = cardHtml(r); bindCard(r); },
+      error: cardNotice,
+      toast: function (x) { notice(x, 'ok'); }
+    });
     var eb = document.getElementById('v-edit');
     if (eb) eb.addEventListener('click', function () { YM.vehicleForm.openEdit(res); });
     var iu = document.getElementById('imr-up');
@@ -598,6 +604,7 @@
       '</div>';
 
     h += YM.share.html(v.share);
+    h += YM.publish ? YM.publish.html(res) : '';
     h += fileChecksHtml(v, res.viewer || {});
 
     h += section('זיהוי', [
