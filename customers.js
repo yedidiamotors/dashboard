@@ -68,6 +68,35 @@
     });
   }
   function uiPrompt(text, value, okLabel) { return uiDialog({ text: text, input: true, value: value, okLabel: okLabel }); }
+  /* שורה חופשית: תיאור + מחיר לפני/כולל מע"מ (מקלידים אחד, השני מושלם) */
+  function customLineDialog() {
+    return new Promise(function (resolve) {
+      var wrap = document.createElement('div');
+      wrap.className = 'modal ui-dialog';
+      wrap.innerHTML = '<div class="modal-box" role="dialog" aria-modal="true"><form class="form" novalidate>' +
+        '<div class="field"><label for="cl-label">תיאור השורה</label>' +
+        '<input id="cl-label" placeholder="למשל: התקנת וו גרירה מקורי"></div>' +
+        '<div class="grid2"><div class="field"><label for="cl-price">מחיר כולל מע"מ (₪)</label>' +
+        '<input id="cl-price" inputmode="decimal" dir="ltr" autocomplete="off"></div></div>' +
+        '<div class="modal-actions"><button class="btn-primary" type="submit">הוספה</button>' +
+        '<button class="btn-ghost ui-cancel" type="button">ביטול</button></div></form></div>';
+      document.body.appendChild(wrap);
+      var lab = wrap.querySelector('#cl-label'), price = wrap.querySelector('#cl-price');
+      if (window.YMVat) YMVat.attach(price);
+      var done = function (v) { document.removeEventListener('keydown', onKey, true); wrap.remove(); resolve(v); };
+      var onKey = function (e) { if (e.key === 'Escape') { e.stopPropagation(); done(null); } };
+      document.addEventListener('keydown', onKey, true);
+      wrap.querySelector('form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!lab.value.trim()) { notice('חסר תיאור לשורה.', 'err'); lab.focus(); return; }
+        if (!String(price.value).trim()) { notice('חסר מחיר — הזינו לפני מע"מ או כולל מע"מ.', 'err'); return; }
+        done({ label: lab.value.trim(), price: price.value });
+      });
+      wrap.querySelector('.ui-cancel').addEventListener('click', function () { done(null); });
+      wrap.addEventListener('click', function (e) { if (e.target === wrap) done(null); });
+      lab.focus();
+    });
+  }
   function uiConfirm(text, okLabel, danger) { return uiDialog({ text: text, okLabel: okLabel, danger: danger }); }
 
   load(true);
@@ -894,11 +923,9 @@
       });
       var cust = el.querySelector('.cart-custom');
       if (cust) cust.addEventListener('click', async function () {
-        var label = await uiPrompt('תיאור השורה (למשל: התקנת וו גרירה מקורי):');
-        if (label === null || !label.trim()) return;
-        var price = await uiPrompt('מחיר כולל מע"מ (₪):');
-        if (price === null || !String(price).trim()) return;
-        orderCall({ action: 'extra_add', deal_id: dealId, label: label, unit_price: price, quantity: 1 });
+        var line = await customLineDialog();
+        if (!line) return;
+        orderCall({ action: 'extra_add', deal_id: dealId, label: line.label, unit_price: line.price, quantity: 1 });
       });
       el.querySelectorAll('.cart-line').forEach(function (row) {
         var lid = row.getAttribute('data-line');
@@ -987,11 +1014,13 @@
     catForm.item_name.value = i ? i.name : '';
     catForm.description.value = i ? (i.description || '') : '';
     catForm.price.value = i ? i.price : '';
+    if (window.YMVat) YMVat.sync(catForm.price);
     catForm.active.checked = i ? !!i.active : true;
     document.getElementById('cat-save').textContent = i ? 'שמירת שינויים' : 'הוספה לקטלוג';
     catForm.item_name.focus();
   }
   if (catForm) {
+    if (window.YMVat) YMVat.attach(catForm.price);
     document.getElementById('cat-new').addEventListener('click', function () { fillCatForm(null); });
     catForm.addEventListener('submit', async function (e) {
       e.preventDefault();
@@ -1086,6 +1115,7 @@
   }
 
   var tForm = document.getElementById('terms-form');
+  if (tForm && window.YMVat) YMVat.attach(tForm.sale_price, { rateInput: tForm.vat_rate });
   function openTerms(d) {
     var t = d.terms || {};
     tForm.reset(); tForm.deal_id.value = d.id;
@@ -1103,6 +1133,7 @@
     tForm.warranty_text.value = t.warranty_text || '';
     tForm.special_terms.value = t.special_terms || '';
     tForm.vat_rate.value = t.vat_rate != null ? t.vat_rate : 18;
+    if (window.YMVat) YMVat.sync(tForm.sale_price);
     show('terms-modal');
   }
   if (tForm) tForm.addEventListener('submit', async function (e) {
@@ -1568,6 +1599,7 @@
   var dealOrderId = null;
   function openDealForm(customer, deal, orderId) {
     dForm.reset();
+    if (window.YMVat) { YMVat.attach(dForm.sale_price); YMVat.sync(dForm.sale_price); }
     dealEditId = deal ? deal.id : null;
     dealOrderId = deal ? null : (orderId || null);
     dForm.customer_id.value = customer.id;

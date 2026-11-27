@@ -480,3 +480,7 @@
   .ofm-grid { grid-template-columns: 1fr; }
   .ofm-fields { grid-template-columns: 1fr 1fr; }
 }
+
+/* מחיר לפני/כולל מע"מ */
+.vat-hint { font-size: 12px; min-height: 15px; }
+.vat-net-field input { background: #101216; }
