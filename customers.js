@@ -1591,45 +1591,149 @@
       dForm.financing_on_private_name.checked = !!deal.financing_on_private_name;
     }
     syncDealHints();
+    vp.loaded = false;
     setPicked(null);
     document.getElementById('veh-list').innerHTML = '';
     hide('card-modal');
     show('deal-modal');
-    searchVehicles('');
+    loadPickerVehicles();
   }
+
+  /* ---------- בוחר רכב להזמנה: צ'יפים (בארץ/בדרך · יצרן · צבע) + רכבים משויכים באפור ---------- */
+  var vp = { all: [], loaded: false, q: '', where: '', make: '', color: '' };
 
   document.getElementById('veh-q').addEventListener('input', function (e) {
     clearTimeout(pickTimer);
     var q = e.target.value.trim();
-    pickTimer = setTimeout(function () { searchVehicles(q); }, 250);
+    pickTimer = setTimeout(function () { searchVehicles(q); }, 120);
   });
 
-  async function searchVehicles(q) {
+  async function loadPickerVehicles() {
     var host = document.getElementById('veh-list');
-    host.innerHTML = '<div class="pick"><span class="s">מחפש…</span></div>';
+    vp.loaded = false; vp.all = []; vp.q = ''; vp.where = ''; vp.make = ''; vp.color = '';
+    document.getElementById('veh-q').value = '';
+    document.getElementById('veh-chips').innerHTML = '';
+    host.innerHTML = '<div class="pick is-msg"><span class="s">טוען רכבים…</span></div>';
     var r;
-    try { r = await YM.api('/inventory/list', { token: session.token, q: q, make: '', status: '', limit: 30, offset: 0 }); }
-    catch (err) { host.innerHTML = '<div class="pick"><span class="s">' + E(err.message) + '</span></div>'; return; }
-    var list = (r.vehicles || []).filter(function (v) { return ['delivered', 'cancelled', 'assigned_to_customer'].indexOf(v.status) === -1; });
-    if (!list.length) { host.innerHTML = '<div class="pick"><span class="s">לא נמצאו רכבים זמינים.</span></div>'; return; }
-    host.innerHTML = list.map(function (v) {
-      return '<div class="pick" data-id="' + E(v.id) + '" data-label="' + E((v.title || '') + ' · ' + (v.model_year || '') + ' · ' + (v.color || '') + ' · ' + (v.vin_tail || '')) + '">' +
-        '<div><div class="t">' + E(v.title || '—') + '</div><div class="s">' + E([v.model_year, v.color, v.location, v.vin ? 'VIN ' + v.vin : null].filter(Boolean).join(' · ')) + '</div></div>' +
-        '<span class="status-pill">' + E(v.status_he) + '</span></div>';
-    }).join('');
-    host.querySelectorAll('.pick').forEach(function (p) {
-      p.addEventListener('click', function () { setPicked({ id: p.getAttribute('data-id'), label: p.getAttribute('data-label') }); });
+    try { r = await YM.api('/orders/action', { token: session.token, action: 'vehicle_picker', deal_id: dealEditId || null }); }
+    catch (err) { r = { ok: false, message_he: err.message }; }
+    if (!r || r.ok !== true) { host.innerHTML = '<div class="pick is-msg"><span class="s">' + E((r && r.message_he) || 'לא ניתן לטעון את הרכבים.') + '</span></div>'; return; }
+    vp.all = (r.vehicles || []).map(function (v) {
+      // איחוד כתיב יצרן מהגיליון, כדי שלא ייווצרו שני צ'יפים לאותו יצרן
+      v.make = ({ 'LAND': 'LAND ROVER', 'MERCEDES-BENZ': 'MERCEDES' })[v.make] || v.make;
+      v._hay = [v.title, v.trim, v.model_year, v.color, v.vin, v.location, v.order_number, v.stock_lot_number,
+        v.taken && v.taken.customer_name, v.taken && v.taken.order_number, v.requested && v.requested.customer_name]
+        .filter(Boolean).join(' ').toLowerCase();
+      return v;
+    }).sort(function (x, y) {
+      var tx = x.taken ? 1 : 0, ty = y.taken ? 1 : 0;
+      if (tx !== ty) return tx - ty;
+      if (x.where !== y.where) return x.where === 'israel' ? -1 : 1;
+      return String(x.title || '').localeCompare(String(y.title || '')) || (Number(y.model_year) || 0) - (Number(x.model_year) || 0);
+    });
+    vp.loaded = true;
+    renderPicker();
+  }
+
+  function searchVehicles(q) {
+    vp.q = String(q || '').toLowerCase();
+    if (vp.loaded) renderPicker();
+  }
+
+  function pickerMatch(v, skip) {
+    if (vp.q && v._hay.indexOf(vp.q) === -1) return false;
+    if (skip !== 'where' && vp.where && v.where !== vp.where) return false;
+    if (skip !== 'make' && vp.make && v.make !== vp.make) return false;
+    if (skip !== 'color' && vp.color && v.color_base !== vp.color) return false;
+    return true;
+  }
+
+  function pickerChipRow(dim, label, options) {
+    // options: [[value, text, count]]
+    var cur = vp[dim];
+    var total = vp.all.filter(function (v) { return pickerMatch(v, dim); }).length;
+    var h = '<div class="veh-chip-row" role="group" aria-label="' + E(label) + '"><span class="veh-chip-label">' + E(label) + '</span>' +
+      '<button class="chip' + (cur === '' ? ' is-active' : '') + '" type="button" data-dim="' + dim + '" data-val="">הכל · ' + total + '</button>';
+    options.forEach(function (o) {
+      if (!o[2] && cur !== o[0]) return;
+      h += '<button class="chip' + (cur === o[0] ? ' is-active' : '') + '" type="button" data-dim="' + dim + '" data-val="' + E(o[0]) + '">' + E(o[1]) + ' · ' + o[2] + '</button>';
+    });
+    return h + '</div>';
+  }
+
+  function pickerFacet(dim, key) {
+    var m = {}, order = [];
+    vp.all.forEach(function (v) {
+      var k = v[key]; if (!k) return;
+      if (!(k in m)) { m[k] = 0; order.push(k); }
+      if (pickerMatch(v, dim)) m[k]++;
+    });
+    return order.map(function (k) { return [k, k, m[k]]; }).sort(function (x, y) { return y[2] - x[2] || String(x[1]).localeCompare(String(y[1])); });
+  }
+
+  function renderPicker() {
+    var chips = document.getElementById('veh-chips');
+    var host = document.getElementById('veh-list');
+    if (dForm.vehicle_file_id.value) { chips.innerHTML = ''; host.innerHTML = ''; return; }
+    var nIl = vp.all.filter(function (v) { return v.where === 'israel' && pickerMatch(v, 'where'); }).length;
+    var nWay = vp.all.filter(function (v) { return v.where === 'way' && pickerMatch(v, 'where'); }).length;
+    chips.innerHTML =
+      pickerChipRow('where', 'מיקום', [['israel', 'בארץ', nIl], ['way', 'בדרך', nWay]]) +
+      pickerChipRow('make', 'יצרן', pickerFacet('make', 'make')) +
+      pickerChipRow('color', 'צבע', pickerFacet('color', 'color_base'));
+    chips.querySelectorAll('.chip').forEach(function (c) {
+      c.addEventListener('click', function () { vp[c.getAttribute('data-dim')] = c.getAttribute('data-val'); renderPicker(); });
+    });
+
+    var list = vp.all.filter(function (v) { return pickerMatch(v); });
+    if (!list.length) { host.innerHTML = '<div class="pick is-msg"><span class="s">לא נמצאו רכבים שמתאימים לסינון.</span></div>'; return; }
+    var free = list.filter(function (v) { return !v.taken; }).length;
+    host.innerHTML = '<div class="pick-count">' + free + ' זמינים' + (list.length - free ? ' · ' + (list.length - free) + ' משויכים' : '') + '</div>' +
+      list.map(function (v) {
+        var sub = [v.model_year, v.color, v.trim, v.location, v.vin ? 'VIN ' + v.vin : null].filter(Boolean).join(' · ');
+        var tags = '<span class="status-pill">' + E(v.status_he) + '</span>';
+        var cls = 'pick', extra = '';
+        if (v.taken) {
+          cls += ' is-taken';
+          var t = v.taken;
+          var who = t.customer_name ? E(t.customer_name) : (t.kind === 'sheet' ? 'לפי גיליון המלאי' : 'לקוח');
+          extra = '<div class="taken-line"><span class="tag-taken">משויך</span> ' + who +
+            (t.order_number ? ' · הזמנה ' + E(t.order_number) : '') +
+            (t.order_state_he ? ' · ' + E(t.order_state_he) : '') +
+            (t.salesperson ? ' · ' + E(t.salesperson) : '') + '</div>';
+        } else if (v.requested && v.requested.customer_name) {
+          extra = '<div class="taken-line"><span class="tag-req">מבוקש</span> ' + E(v.requested.customer_name) + '</div>';
+        } else if (v.allowed === false) {
+          extra = '<div class="taken-line"><span class="tag-req">' + (v.mode === 'presale' ? 'פריסייל — מנהל מכירות בלבד' : 'אין הרשאה לשיוך') + '</span></div>';
+        }
+        return '<div class="' + cls + '" data-id="' + E(v.id) + '"' + (v.taken ? ' aria-disabled="true"' : ' tabindex="0" role="button"') + '>' +
+          '<div><div class="t">' + E(v.title || '—') + '</div><div class="s">' + E(sub) + '</div>' + extra + '</div>' + tags + '</div>';
+      }).join('');
+    host.querySelectorAll('.pick[data-id]').forEach(function (p) {
+      function choose() {
+        var v = vp.all.filter(function (x) { return x.id === p.getAttribute('data-id'); })[0];
+        if (!v) return;
+        if (v.taken) {
+          notice('הרכב כבר משויך' + (v.taken.customer_name ? ' ל' + v.taken.customer_name : '') + (v.taken.order_number ? ' (הזמנה ' + v.taken.order_number + ')' : '') + ' — אי אפשר לשייך אותו להזמנה נוספת עד שהשיוך ישוחרר.', 'err');
+          return;
+        }
+        setPicked({ id: v.id, label: [v.title, v.model_year, v.color, v.vin_tail].filter(Boolean).join(' · ') });
+      }
+      p.addEventListener('click', choose);
+      p.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } });
     });
   }
 
   function setPicked(v) {
     var el = document.getElementById('veh-picked');
     dForm.vehicle_file_id.value = v ? v.id : '';
-    if (!v) { el.hidden = true; el.innerHTML = ''; return; }
+    document.getElementById('veh-q').hidden = !!v;
+    if (!v) { el.hidden = true; el.innerHTML = ''; if (vp.loaded) renderPicker(); return; }
     el.hidden = false;
     el.innerHTML = '<span class="t">' + E(v.label) + '</span><button class="btn-icon" type="button" id="veh-clear">הסרה</button>';
     document.getElementById('veh-clear').addEventListener('click', function () { setPicked(null); });
     document.getElementById('veh-list').innerHTML = '';
+    document.getElementById('veh-chips').innerHTML = '';
   }
 
   dForm.addEventListener('submit', async function (e) {
